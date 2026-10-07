@@ -4,3 +4,6 @@ CREATE DATABASE catalog_db;
 CREATE DATABASE subscription_db;
 CREATE DATABASE billing_db;
 CREATE DATABASE device_db;
+CREATE DATABASE media_db;
+CREATE DATABASE playback_db;
+CREATE DATABASE watch_history_db;

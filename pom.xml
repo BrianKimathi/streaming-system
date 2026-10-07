@@ -35,6 +35,9 @@
         <module>subscription-service</module>
         <module>billing-service</module>
         <module>device-service</module>
+        <module>media-service</module>
+        <module>playback-service</module>
+        <module>watch-history-service</module>
         <module>api-gateway</module>
     </modules>
 

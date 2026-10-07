@@ -30,12 +30,27 @@ spring:
         - id: billing-service
           uri: ${BILLING_SERVICE_URL:http://localhost:8085}
           predicates:
-            - Path=/api/v1/billing/**
+            - Path=/api/v1/devices/**
 
         - id: device-service
           uri: ${DEVICE_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/api/v1/devices/**
+
+        - id: media-service
+          uri: ${MEDIA_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/media/**
+
+        - id: playback-service
+          uri: ${PLAYBACK_SERVICE_URL:http://localhost:8088}
+          predicates:
+            - Path=/api/v1/playback/**
+
+        - id: watch-history-service
+          uri: ${WATCH_HISTORY_SERVICE_URL:http://localhost:8089}
+          predicates:
+            - Path=/api/v1/watch-history/**
 
 jwt:
   secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
