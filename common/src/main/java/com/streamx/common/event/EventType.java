@@ -1,0 +1,41 @@
+package com.streamx.common.event;
+
+public enum EventType {
+    // Auth & User Events
+    USER_REGISTERED,
+    USER_LOGIN,
+    PHONE_VERIFICATION_REQUESTED,
+    PHONE_VERIFIED,
+    PASSWORD_RESET_REQUESTED,
+    PASSWORD_CHANGED,
+
+    // Profile Events
+    PROFILE_CREATED,
+    PROFILE_UPDATED,
+    PROFILE_DELETED,
+
+    // Subscription & Billing Events
+    SUBSCRIPTION_CREATED,
+    SUBSCRIPTION_RENEWED,
+    SUBSCRIPTION_CANCELLED,
+    SUBSCRIPTION_EXPIRED,
+    PAYMENT_INITIATED,
+    PAYMENT_COMPLETED,
+    PAYMENT_FAILED,
+
+    // Device Events
+    DEVICE_REGISTERED,
+    DEVICE_REMOVED,
+
+    // Content Events
+    CONTENT_CREATED,
+    CONTENT_UPDATED,
+    CONTENT_PUBLISHED,
+    CONTENT_UNPUBLISHED,
+
+    // Playback & Watch Events
+    PLAYBACK_STARTED,
+    PLAYBACK_PROGRESS,
+    PLAYBACK_PAUSED,
+    PLAYBACK_COMPLETED
+}

@@ -1,0 +1,26 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### System Files ###
+.DS_Store
+Thumbs.db
+
+### IDE ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.classpath
+.project
+.settings/
+.vscode/
+
+### Logs ###
+*.log
+logs/
+
+### Env ###
+.env
+.env.local

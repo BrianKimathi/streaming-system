@@ -1,0 +1,38 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/auth_db}
+    username: ${SPRING_DATASOURCE_USERNAME:streamx}
+    password: ${SPRING_DATASOURCE_PASSWORD:streamx_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+
+jwt:
+  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  access-token-expiration-ms: 900000 # 15 minutes
+  refresh-token-expiration-ms: 604800000 # 7 days
+
+app:
+  otp:
+    expiration-minutes: 5
+    max-attempts: 3
+    cooldown-seconds: 60
+
+logging:
+  level:
+    com.streamx.auth: DEBUG

@@ -1,0 +1,2793 @@
+# AI AGENT IMPLEMENTATION GUIDE
+
+## Event-Driven Microservices Streaming Platform
+
+You are a senior software architect and principal Java/Spring engineer.
+
+Your task is to design and implement a production-style, Netflix-inspired video streaming platform as a portfolio-grade distributed system.
+
+The objective is NOT to build a superficial "Netflix clone" with CRUD endpoints.
+
+The objective is to demonstrate strong engineering ability in:
+
+* Java
+* Spring Boot
+* Spring Security
+* Microservices architecture
+* Domain-driven service boundaries
+* Event-driven architecture
+* Apache Kafka
+* PostgreSQL
+* Redis
+* API Gateway
+* Authentication and authorization
+* Subscription/entitlement systems
+* Device management
+* Profile management
+* Playback state synchronization
+* Media processing
+* HLS streaming
+* Search
+* Recommendations
+* Trending algorithms
+* Analytics
+* Financial systems
+* Support systems
+* Observability
+* Resilience
+* Testing
+* Docker
+* CI/CD
+* AWS-ready architecture
+
+The system should be designed so that it could eventually be deployed to AWS, but local development must be possible using Docker Compose.
+
+Do NOT attempt to implement everything at once.
+
+Work incrementally.
+
+---
+
+# 1. PRODUCT VISION
+
+Build a streaming platform temporarily called:
+
+**StreamX**
+
+The platform has two major interfaces:
+
+1. User-facing streaming application
+2. Administrative/operations portal
+
+The user-facing application allows customers to:
+
+* Register
+* Login
+* Verify email/phone
+* Create and manage profiles
+* Select profiles
+* Protect profiles with PINs
+* Browse movies and TV shows
+* Search
+* View trending content
+* View popular content
+* View recommendations
+* Add content to My List
+* Watch movies
+* Watch TV episodes
+* Resume playback across devices
+* Manage devices
+* Subscribe to plans
+* Manage subscription
+* View billing history
+* Receive notifications
+* Submit support tickets
+* Manage account/security settings
+
+The administrative application allows authorized staff to:
+
+* Manage users
+* Manage profiles
+* Manage content
+* Manage media
+* Manage subscriptions
+* Manage plans
+* Manage finances
+* Manage reports
+* Manage support tickets
+* Manage moderation
+* Manage marketing/collections
+* Manage notifications
+* Manage feature flags
+* View analytics
+* View audit logs
+* Monitor system health
+
+---
+
+# 2. IMPORTANT ARCHITECTURAL PRINCIPLES
+
+Follow these principles throughout implementation.
+
+## 2.1 Do not create microservices simply because microservices sound impressive
+
+Every service must have a clear responsibility and bounded context.
+
+Avoid:
+
+* shared databases
+* random service-to-service calls
+* duplicated business logic
+* services that only wrap CRUD tables
+* excessive synchronous communication
+
+Prefer:
+
+* clear ownership
+* asynchronous events where appropriate
+* REST for synchronous queries/commands
+* Kafka for domain/integration events
+* eventual consistency where appropriate
+
+---
+
+# 3. INITIAL SERVICE ARCHITECTURE
+
+The target architecture should contain these logical services:
+
+```text
+api-gateway
+auth-service
+user-service
+catalog-service
+subscription-service
+billing-service
+device-service
+playback-service
+watch-history-service
+media-service
+search-service
+trending-service
+recommendation-service
+analytics-service
+notification-service
+support-service
+admin-service
+```
+
+Do NOT necessarily implement all of these immediately.
+
+Start with the minimum viable architecture and introduce services when their domain is understood.
+
+Recommended implementation order:
+
+```text
+Phase 1
+--------
+API Gateway
+Auth
+User
+Catalog
+
+Phase 2
+--------
+Subscription
+Billing
+Device
+
+Phase 3
+--------
+Media
+Playback
+Watch History
+
+Phase 4
+--------
+Kafka
+Trending
+Analytics
+Notifications
+
+Phase 5
+--------
+Search
+Recommendations
+
+Phase 6
+--------
+Support
+Admin
+Reporting
+Moderation
+Marketing
+
+Phase 7
+--------
+Observability
+Resilience
+Performance
+Deployment
+```
+
+---
+
+# 4. TECHNOLOGY STACK
+
+Backend:
+
+* Java 24
+* Spring Boot
+* Spring Security
+* Spring Data JPA
+* Hibernate
+* Spring Kafka
+* Spring Cloud Gateway where appropriate
+* Maven
+
+Databases:
+
+* PostgreSQL
+* Redis
+
+Messaging:
+
+* Apache Kafka
+
+Search:
+
+* OpenSearch or Elasticsearch-compatible architecture
+
+Media:
+
+* FFmpeg
+* HLS
+
+Storage:
+
+* MinIO locally
+* AWS S3-compatible architecture for production
+
+Infrastructure:
+
+* Docker
+* Docker Compose
+
+Observability:
+
+* Prometheus
+* Grafana
+* Loki
+* OpenTelemetry
+
+Testing:
+
+* JUnit
+* Mockito
+* Testcontainers
+* integration tests
+* contract tests where useful
+
+Load testing:
+
+* k6
+
+Frontend:
+
+* React
+* TypeScript
+* Vite
+
+Use current stable versions compatible with the selected Java/Spring stack.
+
+Before generating configuration, verify compatibility between major framework versions.
+
+---
+
+# 5. AUTHENTICATION
+
+Implement authentication centrally.
+
+Requirements:
+
+* registration
+* login
+* logout
+* password hashing
+* JWT access tokens
+* refresh tokens
+* password reset
+* email verification
+* phone verification
+* account status
+* authentication events
+* security/audit events
+
+Use secure password hashing.
+
+Do not store passwords in plaintext.
+
+Do not store OTPs in plaintext in the database.
+
+---
+
+# 6. PHONE VERIFICATION
+
+Phone verification is intentionally SIMULATED for the initial system.
+
+Do NOT integrate Twilio or another SMS provider yet.
+
+However, design the system so a real provider can be added later without changing business logic.
+
+Create an abstraction similar to:
+
+```text
+SmsProvider
+    |
+    +-- MockSmsProvider
+    |
+    +-- TwilioSmsProvider (future)
+```
+
+The mock provider should:
+
+* generate/send simulated OTPs
+* log the OTP during development
+* expose the OTP through a development-only mechanism if useful
+* never expose OTPs in production
+
+OTP requirements:
+
+* 6 digits
+* expiration, e.g. 5 minutes
+* limited verification attempts
+* resend cooldown
+* resend limits
+* invalidate after successful verification
+* only one active OTP per phone
+* hashed OTP storage
+* rate limiting
+
+Example conceptual flow:
+
+```text
+User
+ |
+ | phone number
+ v
+Auth Service
+ |
+ | generate OTP
+ v
+Verification subsystem
+ |
+ v
+Mock SMS Provider
+ |
+ v
+Development console/UI
+```
+
+Create the abstraction now so replacing the provider later is straightforward.
+
+---
+
+# 7. ACCOUNT MODEL
+
+The account is the owner of:
+
+* credentials
+* subscription
+* billing
+* registered devices
+* account security
+* profiles
+
+Conceptually:
+
+```text
+ACCOUNT
+ |
+ +-- SUBSCRIPTION
+ |
+ +-- PROFILES
+ |
+ +-- DEVICES
+ |
+ +-- SECURITY
+ |
+ +-- BILLING
+```
+
+Do not confuse account identity with profiles.
+
+---
+
+# 8. PROFILE SYSTEM
+
+An account may have multiple profiles according to the subscription's entitlement.
+
+A profile contains:
+
+* profile ID
+* account ID
+* name
+* avatar
+* type
+* PIN configuration
+* PIN hash
+* maturity restriction
+* language
+* subtitle preferences
+* audio preferences
+* autoplay preferences
+* recommendation preferences
+
+Profile types:
+
+```text
+ADULT
+KIDS
+```
+
+Potential future types can be added without redesigning the system.
+
+Profile PIN:
+
+* never store plaintext
+* hash it
+* rate-limit attempts
+* support lockout
+* allow account owner to manage it
+
+Flow:
+
+```text
+Login
+  |
+  v
+Account authenticated
+  |
+  v
+Profile selection
+  |
+  v
+Profile PIN if required
+  |
+  v
+Profile session
+```
+
+---
+
+# 9. PLAN SYSTEM
+
+Subscription plans MUST be dynamically configurable from the admin portal.
+
+Do NOT hard-code:
+
+```text
+BASIC
+STANDARD
+PREMIUM
+```
+
+into application logic.
+
+Instead, plans are data.
+
+A plan should support configurable attributes such as:
+
+```text
+name
+description
+price
+currency
+billing_interval
+
+max_profiles
+max_registered_devices
+max_concurrent_streams
+
+max_resolution
+hdr_enabled
+
+audio_quality
+
+downloads_enabled
+max_download_devices
+
+offline_viewing
+spatial_audio
+
+kids_profiles_enabled
+```
+
+Example:
+
+```text
+Mobile
+KSh 299/month
+
+max_profiles = 1
+max_registered_devices = 3
+max_concurrent_streams = 1
+max_resolution = 720P
+downloads_enabled = true
+```
+
+Another:
+
+```text
+Standard
+KSh 599/month
+
+max_profiles = 3
+max_registered_devices = 4
+max_concurrent_streams = 2
+max_resolution = 1080P
+```
+
+Another:
+
+```text
+Premium
+KSh 999/month
+
+max_profiles = 5
+max_registered_devices = 6
+max_concurrent_streams = 4
+max_resolution = 4K
+downloads_enabled = true
+```
+
+The admin must be able to create a completely different plan without requiring a code deployment.
+
+---
+
+# 10. ENTITLEMENTS
+
+Separate the concept of:
+
+```text
+Plan
+Subscription
+Entitlement
+```
+
+A subscription references a plan/version.
+
+The effective capabilities of the subscription should be represented as entitlements.
+
+Example:
+
+```json
+{
+  "maxProfiles": 5,
+  "maxRegisteredDevices": 6,
+  "maxConcurrentStreams": 4,
+  "maxResolution": "4K",
+  "downloadsEnabled": true,
+  "maxDownloadDevices": 4,
+  "hdrEnabled": true
+}
+```
+
+Playback and other services should ask:
+
+```text
+Does this subscription have entitlement X?
+```
+
+rather than:
+
+```text
+if plan == PREMIUM
+```
+
+This is a critical architectural requirement.
+
+---
+
+# 11. PLAN VERSIONING
+
+Plans must be versioned.
+
+Do NOT mutate an existing plan in a way that silently changes the terms of existing subscriptions.
+
+Example:
+
+```text
+Premium v1
+KSh 999
+4 devices
+4 profiles
+4K
+```
+
+Later:
+
+```text
+Premium v2
+KSh 1,199
+5 devices
+5 profiles
+4K
+```
+
+Existing subscriptions can remain attached to v1 while new subscriptions use v2.
+
+Support:
+
+* plan versions
+* effective dates
+* active/inactive status
+* future plan versions
+* optional migration rules
+
+---
+
+# 12. DEVICE MANAGEMENT
+
+Distinguish:
+
+```text
+Maximum Registered Devices
+```
+
+from:
+
+```text
+Maximum Concurrent Streams
+```
+
+Example:
+
+```text
+maxRegisteredDevices = 5
+maxConcurrentStreams = 2
+```
+
+The account may register:
+
+```text
+TV
+Phone
+Tablet
+Laptop
+Console
+```
+
+but only two may actively stream at the same time.
+
+Device information can include:
+
+```text
+deviceId
+accountId
+deviceType
+platform
+deviceName
+appVersion
+registeredAt
+lastSeenAt
+status
+```
+
+Support:
+
+* device registration
+* device listing
+* device removal
+* force logout
+* session revocation
+* device limit enforcement
+
+When registering a new device:
+
+```text
+Authenticate
+   |
+Check subscription
+   |
+Check registered-device count
+   |
+If below limit:
+    register
+Else:
+    reject
+```
+
+---
+
+# 13. PLAYBACK AUTHORIZATION
+
+A user must not receive a permanent public URL to a movie.
+
+Playback should be authorized.
+
+Flow:
+
+```text
+Client
+ |
+ | request playback
+ v
+Playback Service
+ |
+ +-- authenticate
+ |
+ +-- validate profile
+ |
+ +-- validate subscription
+ |
+ +-- validate content entitlement
+ |
+ +-- validate device
+ |
+ +-- validate concurrent streams
+ |
+ +-- create playback session
+ |
+ v
+Signed/temporary playback access
+ |
+ v
+HLS content
+```
+
+Implement playback sessions with:
+
+* session ID
+* profile ID
+* account ID
+* device ID
+* content ID
+* start time
+* last heartbeat
+* status
+* expiration
+* termination reason
+
+---
+
+# 14. MOVIE AND SHOW CONTENT MODEL
+
+Support:
+
+```text
+Movie
+TV Show
+Season
+Episode
+Genre
+Person
+Actor
+Director
+Language
+Subtitle
+Audio Track
+Collection
+```
+
+Relationships:
+
+```text
+Show
+ |
+ +-- Season
+       |
+       +-- Episode
+```
+
+Movies can have:
+
+* title
+* synopsis
+* release date
+* runtime
+* genres
+* cast
+* directors
+* maturity rating
+* languages
+* subtitles
+* poster
+* backdrop
+* trailer
+* media assets
+* availability regions
+
+---
+
+# 15. CONTENT LIFECYCLE
+
+Content should have states such as:
+
+```text
+DRAFT
+PROCESSING
+READY
+SCHEDULED
+PUBLISHED
+EXPIRING
+EXPIRED
+ARCHIVED
+```
+
+Do not treat content as simply "exists / doesn't exist."
+
+---
+
+# 16. WATCH PROGRESS
+
+Viewing progress belongs to the PROFILE, not the device.
+
+This is mandatory.
+
+Example:
+
+```text
+Brian Profile
+ |
+ +-- Movie A
+ |     position = 2832 sec
+ |     progress = 42%
+ |
+ +-- Show B / S01E03
+       position = 1274 sec
+       progress = 63%
+```
+
+A user must be able to:
+
+```text
+Watch on TV
+     |
+     v
+Stop at 47:32
+     |
+     v
+Later open phone
+     |
+     v
+Continue from 47:32
+```
+
+Progress must therefore be synchronized centrally.
+
+---
+
+# 17. WATCH HISTORY SERVICE
+
+Create a dedicated domain/service responsible for:
+
+* watch progress
+* completed titles
+* viewing history
+* continue watching
+* recently watched
+* episode progression
+
+For episodes, progress belongs to the episode.
+
+Example:
+
+```text
+Profile
+ |
+ +-- Show A
+      |
+      +-- S01E01 = 100%
+      +-- S01E02 = 100%
+      +-- S01E03 = 63%
+      +-- S01E04 = 0%
+```
+
+---
+
+# 18. PROGRESS EVENTS
+
+Do not write playback progress to PostgreSQL every second.
+
+Use an event-driven approach.
+
+Player can periodically emit progress:
+
+```json
+{
+  "eventType": "PLAYBACK_PROGRESS",
+  "eventId": "...",
+  "profileId": "...",
+  "accountId": "...",
+  "deviceId": "...",
+  "contentId": "...",
+  "positionSeconds": 2832,
+  "durationSeconds": 6740,
+  "timestamp": "..."
+}
+```
+
+Use Kafka and/or Redis to handle high-frequency state.
+
+Persist durable watch state asynchronously.
+
+Implement idempotency.
+
+Consider:
+
+* event ordering
+* duplicate events
+* stale events
+* concurrent devices
+* optimistic concurrency
+* last-write semantics
+* version numbers
+
+Do not blindly overwrite newer progress with an older event.
+
+---
+
+# 19. KAFKA EVENT ARCHITECTURE
+
+Kafka is the event backbone of the platform.
+
+Do not introduce Kafka purely for decoration.
+
+Events should have real consumers.
+
+Suggested event categories:
+
+```text
+user.events
+subscription.events
+billing.events
+content.events
+playback.events
+engagement.events
+device.events
+support.events
+```
+
+Example events:
+
+```text
+USER_REGISTERED
+USER_LOGIN
+PHONE_VERIFIED
+
+PROFILE_CREATED
+PROFILE_DELETED
+
+SUBSCRIPTION_CREATED
+SUBSCRIPTION_RENEWED
+SUBSCRIPTION_CANCELLED
+SUBSCRIPTION_EXPIRED
+
+PAYMENT_INITIATED
+PAYMENT_COMPLETED
+PAYMENT_FAILED
+PAYMENT_REFUNDED
+
+CONTENT_CREATED
+CONTENT_PUBLISHED
+CONTENT_UNPUBLISHED
+
+DEVICE_REGISTERED
+DEVICE_REMOVED
+
+PLAYBACK_STARTED
+PLAYBACK_PROGRESS
+PLAYBACK_PAUSED
+PLAYBACK_COMPLETED
+
+CONTENT_LIKED
+CONTENT_RATED
+CONTENT_ADDED_TO_LIST
+CONTENT_REMOVED_FROM_LIST
+
+SEARCH_PERFORMED
+
+SUPPORT_TICKET_CREATED
+SUPPORT_TICKET_RESOLVED
+```
+
+Use an event envelope containing fields such as:
+
+```text
+eventId
+eventType
+eventVersion
+occurredAt
+producer
+correlationId
+aggregateId
+payload
+```
+
+Events must be versionable.
+
+---
+
+# 20. TRENDING
+
+Build a real trending system.
+
+Trending is NOT simply:
+
+```sql
+ORDER BY lifetime_views DESC
+```
+
+Trending should measure recent momentum.
+
+Potential scoring model:
+
+```text
+TrendingScore =
+    recent views
+  + completions
+  + likes
+  + watchlist additions
+  + weighted velocity
+  - time decay
+```
+
+For example:
+
+```text
+5 × views_last_1h
+3 × views_last_6h
+2 × completions_last_24h
+1 × likes_last_24h
+- decay
+```
+
+The exact algorithm can evolve.
+
+Use Kafka events as input.
+
+Potential architecture:
+
+```text
+Playback
+   |
+   v
+Kafka
+   |
+   v
+Trending Consumer
+   |
+   +-- Redis counters
+   |
+   +-- ranking computation
+   |
+   v
+Trending results
+```
+
+Support regional trending where possible.
+
+For example:
+
+```text
+Global Trending
+Kenya Trending
+East Africa Trending
+```
+
+---
+
+# 21. POPULAR CONTENT
+
+Popular should be distinct from trending.
+
+Popular:
+
+* longer-term
+* historical
+* cumulative or rolling-period popularity
+
+Trending:
+
+* recent momentum
+* velocity
+* short-term changes
+
+Support:
+
+```text
+Popular today
+Popular this week
+Popular this month
+All-time popular
+```
+
+---
+
+# 22. RECOMMENDATION SYSTEM
+
+Start simple.
+
+Version 1:
+
+Content-based recommendations.
+
+Use:
+
+* genres
+* tags
+* actors
+* directors
+* language
+* user likes
+* watch history
+
+Example user preference vector:
+
+```text
+SCI_FI = 0.82
+THRILLER = 0.71
+COMEDY = 0.22
+DOCUMENTARY = 0.43
+```
+
+Later support:
+
+* collaborative filtering
+* similar users
+* "Because you watched..."
+* recommendation models
+* ML feature pipelines
+
+Do not introduce complex ML before the event/data infrastructure works.
+
+---
+
+# 23. SEARCH
+
+Use a dedicated search service when appropriate.
+
+Support:
+
+* full-text search
+* fuzzy matching
+* autocomplete
+* actors
+* directors
+* movies
+* shows
+* genres
+* filters
+* sorting
+
+Example:
+
+```text
+batmn
+```
+
+should potentially find:
+
+```text
+Batman
+Batman Begins
+The Batman
+The Dark Knight
+```
+
+---
+
+# 24. MEDIA SERVICE
+
+Media management should support:
+
+```text
+movie upload
+poster upload
+trailer upload
+subtitle upload
+audio track upload
+```
+
+Media pipeline:
+
+```text
+Upload
+  |
+  v
+Object Storage
+  |
+  v
+Processing Job
+  |
+  v
+FFmpeg
+  |
+  +-- 360p
+  +-- 480p
+  +-- 720p
+  +-- 1080p
+  +-- 4K
+  |
+  v
+HLS generation
+  |
+  v
+Ready
+```
+
+Use MinIO locally.
+
+Design storage abstractions so AWS S3 can replace MinIO.
+
+---
+
+# 25. HLS STREAMING
+
+The player should eventually consume HLS rather than simply downloading an MP4.
+
+Conceptually:
+
+```text
+movie.mp4
+   |
+ FFmpeg
+   |
+   v
+master.m3u8
+   |
+   +-- 360p playlist
+   +-- 480p playlist
+   +-- 720p playlist
+   +-- 1080p playlist
+```
+
+The actual CDN architecture can be introduced later.
+
+---
+
+# 26. BILLING
+
+Separate subscription state from payment transactions.
+
+Conceptually:
+
+```text
+Subscription Service
+        |
+        v
+Billing Service
+        |
+        v
+Payment Provider
+```
+
+Initially provide a mock payment provider.
+
+Later support real providers.
+
+Payment states:
+
+```text
+INITIATED
+PENDING
+COMPLETED
+FAILED
+REFUNDED
+CANCELLED
+```
+
+Subscription states:
+
+```text
+TRIAL
+ACTIVE
+PAST_DUE
+GRACE_PERIOD
+CANCELLED
+EXPIRED
+SUSPENDED
+```
+
+Do not conflate payment status with subscription status.
+
+---
+
+# 27. FINANCIAL SYSTEM
+
+Admin finance module should provide:
+
+* transactions
+* revenue
+* refunds
+* failed payments
+* settlements
+* reconciliation
+* invoices
+* subscription revenue
+* plan revenue
+* payment method breakdown
+* revenue by period
+* revenue by region
+
+Build transaction records with immutable financial history where appropriate.
+
+Do not simply update a transaction's amount/status without auditability.
+
+---
+
+# 28. ADMIN PORTAL
+
+The admin portal should contain:
+
+```text
+Dashboard
+Users
+Content
+Media
+Plans
+Subscriptions
+Payments
+Finances
+Reports
+Analytics
+Support
+Moderation
+Marketing
+Notifications
+Feature Flags
+Audit Logs
+System Health
+```
+
+---
+
+# 29. ADMIN USER MANAGEMENT
+
+Admins should be able to:
+
+* search users
+* view users
+* view profiles
+* view subscriptions
+* view devices
+* view payment history
+* view support history
+* suspend users
+* reactivate users
+* ban users
+* force logout
+* revoke sessions
+* reset certain account security states
+
+Sensitive operations must require appropriate permissions.
+
+---
+
+# 30. ADMIN RBAC
+
+Do not use one generic ADMIN role.
+
+Support roles such as:
+
+```text
+SUPER_ADMIN
+ADMIN
+CONTENT_MANAGER
+FINANCE_MANAGER
+SUPPORT_AGENT
+ANALYST
+MODERATOR
+```
+
+Permission-based authorization should be supported.
+
+Examples:
+
+```text
+USER_READ
+USER_SUSPEND
+USER_BAN
+
+CONTENT_CREATE
+CONTENT_EDIT
+CONTENT_PUBLISH
+
+PAYMENT_READ
+REFUND_CREATE
+
+REPORT_READ
+REPORT_EXPORT
+
+SUPPORT_READ
+SUPPORT_ASSIGN
+SUPPORT_RESOLVE
+```
+
+---
+
+# 31. ADMIN PLAN BUILDER
+
+The admin UI must allow creation of flexible plans.
+
+Fields should include:
+
+```text
+Name
+Description
+Price
+Currency
+Billing interval
+
+Maximum profiles
+Maximum registered devices
+Maximum concurrent streams
+
+Maximum video resolution
+HDR
+Audio quality
+
+Downloads
+Maximum download devices
+
+Kids profiles
+Offline viewing
+Spatial audio
+```
+
+Admin should be able to:
+
+* create
+* edit
+* activate
+* deactivate
+* schedule
+* version
+* duplicate
+
+plans.
+
+---
+
+# 32. SUPPORT SYSTEM
+
+Build a ticketing system.
+
+Ticket fields:
+
+```text
+ticketId
+userId
+category
+priority
+status
+assignedAgent
+createdAt
+updatedAt
+resolvedAt
+```
+
+Statuses:
+
+```text
+OPEN
+IN_PROGRESS
+WAITING_FOR_USER
+ESCALATED
+RESOLVED
+CLOSED
+```
+
+Support agents should see relevant account context without receiving unrestricted access to sensitive data.
+
+---
+
+# 33. REPORTING
+
+Reports should be generated asynchronously when expensive.
+
+Reports:
+
+```text
+User report
+Revenue report
+Subscription report
+Payment report
+Refund report
+Content report
+Watch-time report
+Playback report
+Churn report
+Support report
+```
+
+Potential formats:
+
+```text
+CSV
+XLSX
+PDF
+```
+
+For large reports:
+
+```text
+Admin
+ |
+ v
+Report Request
+ |
+ v
+Background Job
+ |
+ v
+Report Service
+ |
+ v
+Object Storage
+ |
+ v
+Download
+```
+
+Do not make an HTTP request wait while millions of rows are processed.
+
+---
+
+# 34. ANALYTICS
+
+Track:
+
+User:
+
+* DAU
+* WAU
+* MAU
+* retention
+* churn
+* registrations
+
+Content:
+
+* views
+* unique viewers
+* completion rate
+* watch time
+* abandonment
+* likes
+* ratings
+
+Playback:
+
+* concurrent viewers
+* buffering
+* errors
+* bitrate
+* resolution
+* device type
+
+Business:
+
+* MRR
+* ARR
+* ARPU
+* conversion
+* churn
+* plan distribution
+
+---
+
+# 35. MODERATION
+
+Support:
+
+* content reports
+* review moderation
+* user reports
+* spam
+* abusive users
+* inappropriate content
+* copyright complaints
+
+Actions:
+
+```text
+WARN
+HIDE
+REMOVE
+SUSPEND
+BAN
+ESCALATE
+```
+
+All important moderation actions should produce audit events.
+
+---
+
+# 36. MARKETING
+
+Support:
+
+* promotions
+* coupons
+* campaigns
+* collections
+* featured content
+* homepage merchandising
+* scheduled banners
+* targeted notifications
+
+Example:
+
+```text
+October Horror Week
+
+Audience:
+Users interested in horror
+
+Collection:
+Horror movies
+
+Start:
+2026-10-15
+
+End:
+2026-10-31
+```
+
+---
+
+# 37. FEATURE FLAGS
+
+Implement feature flags so features can be enabled gradually.
+
+Example:
+
+```text
+new_player = ON
+new_recommendations = OFF
+ai_recommendations = 5%
+new_homepage = 10%
+```
+
+Future targeting:
+
+```text
+country = KE
+plan = PREMIUM
+percentage = 10%
+```
+
+---
+
+# 38. NOTIFICATIONS
+
+Create notification abstractions.
+
+Channels:
+
+```text
+EMAIL
+SMS
+PUSH
+IN_APP
+```
+
+Initial development providers can be mocked.
+
+Support:
+
+* password/security alerts
+* subscription events
+* payment failures
+* new releases
+* recommendations
+* watchlist releases
+* content leaving soon
+
+Notifications should be event-driven where appropriate.
+
+---
+
+# 39. AUDIT LOGGING
+
+Sensitive actions must be audited.
+
+Example:
+
+```text
+Admin: admin-123
+Action: SUSPEND_USER
+Target: user-456
+Reason: suspicious activity
+Timestamp: ...
+Correlation ID: ...
+```
+
+Audit:
+
+* admin actions
+* refunds
+* subscription changes
+* plan changes
+* content publishing
+* user suspension
+* role changes
+* report exports
+* security events
+
+Audit records should be append-oriented and difficult to tamper with.
+
+---
+
+# 40. OBSERVABILITY
+
+Instrument services with:
+
+* structured logging
+* metrics
+* distributed tracing
+
+Use:
+
+```text
+Prometheus
+Grafana
+Loki
+OpenTelemetry
+```
+
+Track:
+
+```text
+HTTP request rate
+HTTP error rate
+p50 latency
+p95 latency
+p99 latency
+Kafka consumer lag
+database connection usage
+Redis health
+playback errors
+subscription errors
+payment failures
+```
+
+Every request should support correlation/trace IDs.
+
+---
+
+# 41. RESILIENCE
+
+The system must tolerate service failure.
+
+Example:
+
+```text
+Playback
+   |
+   v
+Kafka
+   |
+   +----> Trending
+   |
+   +----> Analytics
+```
+
+If Trending is down:
+
+**Playback must continue.**
+
+Kafka should retain events.
+
+When Trending returns:
+
+```text
+Kafka
+ |
+ | replay
+ v
+Trending
+```
+
+Implement and demonstrate:
+
+* retries
+* dead-letter topics
+* idempotent consumers
+* timeouts
+* circuit breakers where justified
+* backpressure
+* graceful degradation
+
+Do not add resilience patterns everywhere blindly.
+
+---
+
+# 42. DATA OWNERSHIP
+
+Each service should own its database/schema.
+
+Avoid:
+
+```text
+All services
+     |
+     v
+One giant PostgreSQL database
+```
+
+Prefer:
+
+```text
+Auth -------- auth DB
+User -------- user DB
+Catalog ----- catalog DB
+Subscription  subscription DB
+Billing ------ billing DB
+Watch History  watch-history DB
+```
+
+Local development may use one PostgreSQL server with separate databases/schemas if necessary, but logical ownership must remain clear.
+
+A service must not directly query another service's tables.
+
+---
+
+# 43. SYNCHRONOUS VS ASYNCHRONOUS COMMUNICATION
+
+Use REST when immediate response is required.
+
+Examples:
+
+```text
+Get movie
+Get profile
+Check playback authorization
+Get subscription
+Search
+```
+
+Use Kafka when downstream processing can be asynchronous.
+
+Examples:
+
+```text
+Playback completed
+Payment completed
+User registered
+Content published
+Search performed
+Support ticket created
+```
+
+Always explain why a communication mechanism is chosen.
+
+---
+
+# 44. API DESIGN
+
+Use clean REST APIs.
+
+Examples:
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/refresh
+
+GET /api/profiles
+POST /api/profiles
+PATCH /api/profiles/{id}
+
+GET /api/catalog/movies
+GET /api/catalog/movies/{id}
+GET /api/catalog/shows/{id}
+
+GET /api/trending
+GET /api/popular
+GET /api/recommendations
+
+POST /api/playback/sessions
+POST /api/playback/sessions/{id}/heartbeat
+
+GET /api/watch-history
+GET /api/watch-history/continue-watching
+
+GET /api/subscription
+POST /api/subscription
+POST /api/subscription/cancel
+
+GET /api/devices
+DELETE /api/devices/{id}
+```
+
+Use consistent error responses.
+
+Prefer a standard error structure containing things such as:
+
+```text
+timestamp
+status
+code
+message
+path
+correlationId
+```
+
+---
+
+# 45. SECURITY
+
+Implement:
+
+* JWT
+* refresh token rotation where appropriate
+* password hashing
+* RBAC
+* permission checks
+* rate limiting
+* input validation
+* secure headers
+* CORS
+* CSRF considerations
+* account lockout/rate limits
+* audit logging
+* secrets outside source code
+
+Never expose:
+
+* passwords
+* password hashes
+* OTP hashes
+* refresh tokens
+* payment secrets
+
+in API responses.
+
+---
+
+# 46. CACHING
+
+Use Redis intentionally.
+
+Good candidates:
+
+* trending
+* popular
+* recommendations
+* catalog metadata
+* sessions
+* OTP rate limits
+* device/session state
+* short-lived authorization information
+
+Do not cache everything.
+
+Document:
+
+* cache key
+* TTL
+* invalidation strategy
+* consistency expectations
+
+---
+
+# 47. IDEMPOTENCY
+
+Implement idempotency where duplicate requests/events could cause damage.
+
+Important examples:
+
+```text
+Payment processing
+Subscription creation
+Refunds
+Kafka consumers
+Watch progress
+Notification dispatch
+```
+
+For example, a duplicate:
+
+```text
+PAYMENT_COMPLETED
+```
+
+must not activate the subscription twice or create duplicate financial records.
+
+---
+
+# 48. DATABASE DESIGN
+
+Before implementing each service:
+
+1. Define aggregates
+2. Define entities
+3. Define relationships
+4. Define indexes
+5. Define constraints
+6. Identify read-heavy queries
+7. Identify write-heavy operations
+8. Explain consistency requirements
+
+Do not create entities simply by converting every noun in the requirements into a table.
+
+---
+
+# 49. INDEXING AND PERFORMANCE
+
+Identify important queries.
+
+Examples:
+
+```text
+Find user's active subscription
+Find profile's continue watching
+Find active playback sessions
+Find trending titles
+Find devices for account
+Find episodes for season
+Find content by genre
+```
+
+Create appropriate indexes.
+
+Later demonstrate query analysis and optimization.
+
+---
+
+# 50. TESTING STRATEGY
+
+Every service should have:
+
+### Unit tests
+
+Business rules.
+
+### Integration tests
+
+Database, Kafka, Redis, etc.
+
+Use Testcontainers where useful.
+
+### API tests
+
+Validate REST contracts.
+
+### Security tests
+
+Test:
+
+* unauthorized requests
+* forbidden requests
+* role permissions
+* expired tokens
+* invalid tokens
+
+### Event tests
+
+Verify consumers correctly process events.
+
+### Failure tests
+
+Simulate:
+
+* Kafka unavailable
+* database unavailable
+* Redis unavailable
+* downstream service timeout
+* duplicate event
+* stale event
+
+---
+
+# 51. LOCAL DEVELOPMENT
+
+Provide a Docker Compose environment containing appropriate infrastructure.
+
+Initially:
+
+```text
+PostgreSQL
+Redis
+Kafka
+Kafka UI
+MinIO
+Prometheus
+Grafana
+Loki
+OpenTelemetry components where necessary
+```
+
+Services should be individually runnable from IntelliJ during development.
+
+Provide:
+
+```text
+docker-compose.yml
+.env.example
+README.md
+```
+
+Never commit secrets.
+
+---
+
+# 52. PROJECT STRUCTURE
+
+Use a monorepo initially for simplicity.
+
+Example:
+
+```text
+streamx/
+│
+├── services/
+│   ├── api-gateway/
+│   ├── auth-service/
+│   ├── user-service/
+│   ├── catalog-service/
+│   ├── subscription-service/
+│   ├── billing-service/
+│   ├── device-service/
+│   ├── playback-service/
+│   ├── watch-history-service/
+│   ├── media-service/
+│   ├── search-service/
+│   ├── trending-service/
+│   ├── recommendation-service/
+│   ├── analytics-service/
+│   ├── notification-service/
+│   ├── support-service/
+│   └── admin-service/
+│
+├── frontend/
+│   ├── user-app/
+│   └── admin-app/
+│
+├── infrastructure/
+│   ├── docker/
+│   ├── kafka/
+│   ├── postgres/
+│   ├── monitoring/
+│   └── nginx/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   ├── events/
+│   ├── database/
+│   └── decisions/
+│
+└── README.md
+```
+
+Do not force all services to share Java classes.
+
+Shared libraries should be introduced only when there is a genuine need.
+
+---
+
+# 53. DOCUMENTATION REQUIREMENT
+
+Before implementing significant functionality, document:
+
+* functional requirements
+* non-functional requirements
+* architecture
+* service responsibilities
+* database ownership
+* API contracts
+* Kafka events
+* security model
+* deployment model
+* important architectural decisions
+
+Maintain an Architecture Decision Record (ADR) for significant decisions.
+
+Example:
+
+```text
+ADR-001:
+Why Kafka is used for playback events
+
+ADR-002:
+Why watch progress belongs to profiles
+
+ADR-003:
+Why registered devices and concurrent streams are separate
+
+ADR-004:
+Why subscription plans are versioned
+
+ADR-005:
+Why PostgreSQL is used for durable watch state
+```
+
+---
+
+# 54. IMPLEMENTATION WORKFLOW
+
+Follow this workflow for every phase.
+
+## Step 1
+
+Understand the requirements.
+
+## Step 2
+
+Identify domain boundaries.
+
+## Step 3
+
+Design the data model.
+
+## Step 4
+
+Design APIs.
+
+## Step 5
+
+Design events.
+
+## Step 6
+
+Explain consistency requirements.
+
+## Step 7
+
+Implement.
+
+## Step 8
+
+Write tests.
+
+## Step 9
+
+Run the application.
+
+## Step 10
+
+Demonstrate the feature end-to-end.
+
+## Step 11
+
+Document the implementation.
+
+Do NOT skip directly from requirements to code.
+
+---
+
+# 55. FIRST IMPLEMENTATION PHASE
+
+Do not implement the entire platform immediately.
+
+Start with:
+
+```text
+api-gateway
+auth-service
+user-service
+catalog-service
+```
+
+Implement:
+
+### Authentication
+
+* registration
+* login
+* JWT
+* refresh token
+* simulated phone verification
+
+### Account
+
+* user
+* account status
+
+### Profiles
+
+* create
+* update
+* delete
+* list
+* profile PIN
+* kids profile
+
+### Catalog
+
+* movies
+* shows
+* seasons
+* episodes
+* genres
+
+### Frontend
+
+Create basic screens:
+
+```text
+Login
+Register
+Phone Verification
+Profile Selection
+Home
+Movie Details
+Show Details
+```
+
+Do not build sophisticated recommendations or Kafka analytics yet.
+
+---
+
+# 56. SECOND PHASE
+
+Implement:
+
+```text
+subscription-service
+billing-service
+device-service
+```
+
+Implement:
+
+* admin-created plans
+* flexible plan configuration
+* plan versioning
+* subscriptions
+* mock payments
+* devices
+* device limits
+* concurrent stream limits
+* subscription entitlements
+
+Demonstrate:
+
+```text
+Mobile plan
+3 devices
+1 concurrent stream
+720p
+
+User registers:
+TV
+Phone
+Laptop
+
+Fourth device:
+REJECTED
+
+TV watching:
+Phone attempts playback:
+REJECTED
+```
+
+---
+
+# 57. THIRD PHASE
+
+Implement:
+
+```text
+media-service
+playback-service
+watch-history-service
+```
+
+Implement:
+
+* media uploads
+* MinIO
+* FFmpeg
+* HLS
+* playback authorization
+* playback sessions
+* progress tracking
+* cross-device resume
+
+Demonstrate:
+
+```text
+TV
+ |
+Watch movie to 47:32
+ |
+Stop
+
+Phone
+ |
+Open same profile
+ |
+Continue watching
+ |
+Resume at 47:32
+```
+
+This is a major milestone.
+
+---
+
+# 58. FOURTH PHASE
+
+Introduce Kafka.
+
+Start emitting real events.
+
+Example:
+
+```text
+PLAYBACK_STARTED
+PLAYBACK_PROGRESS
+PLAYBACK_COMPLETED
+SUBSCRIPTION_CREATED
+PAYMENT_COMPLETED
+CONTENT_PUBLISHED
+```
+
+Build:
+
+```text
+trending-service
+analytics-service
+notification-service
+```
+
+Demonstrate Kafka consumers independently reacting to the same event.
+
+---
+
+# 59. FIFTH PHASE
+
+Build:
+
+```text
+search-service
+recommendation-service
+```
+
+Implement:
+
+* fuzzy search
+* autocomplete
+* trending
+* popular
+* content-based recommendations
+* "Because you watched..."
+* personalized homepage sections
+
+---
+
+# 60. SIXTH PHASE
+
+Build the administrative platform.
+
+Admin dashboard:
+
+```text
+Dashboard
+Users
+Content
+Media
+Plans
+Subscriptions
+Payments
+Finances
+Analytics
+Reports
+Support
+Moderation
+Marketing
+Notifications
+Feature Flags
+Audit Logs
+System Health
+```
+
+Use RBAC.
+
+Do not give every admin access to everything.
+
+---
+
+# 61. SEVENTH PHASE
+
+Production engineering.
+
+Implement:
+
+* metrics
+* tracing
+* logging
+* dashboards
+* alerts
+* retries
+* dead-letter topics
+* circuit breakers where justified
+* load tests
+* database optimization
+* Kafka performance analysis
+* Redis analysis
+* failure testing
+
+Perform load tests and document results.
+
+---
+
+# 62. IMPORTANT DEMONSTRATION SCENARIOS
+
+The final project should demonstrate these scenarios.
+
+## Scenario 1: New account
+
+```text
+Register
+→ Verify phone
+→ Login
+→ Create profile
+→ Set PIN
+```
+
+## Scenario 2: Subscription
+
+```text
+Select plan
+→ Mock payment
+→ Payment completed
+→ Subscription activated
+→ Entitlements applied
+```
+
+## Scenario 3: Device limit
+
+```text
+Plan allows 3 devices
+
+Register:
+TV
+Phone
+Laptop
+
+Register tablet
+→ rejected
+```
+
+## Scenario 4: Concurrent streams
+
+```text
+Plan allows 2 streams
+
+TV → streaming
+Phone → streaming
+Laptop → rejected
+```
+
+## Scenario 5: Cross-device playback
+
+```text
+TV:
+Movie → 47:32
+
+Phone:
+Continue → 47:32
+```
+
+## Scenario 6: Trending
+
+```text
+Users watch movie
+→ Kafka
+→ Trending consumer
+→ Redis
+→ ranking changes
+→ movie appears in Trending
+```
+
+## Scenario 7: Service failure
+
+```text
+Trending service DOWN
+
+Playback continues.
+
+Trending returns.
+
+Kafka events are consumed.
+
+Trending catches up.
+```
+
+## Scenario 8: Payment failure
+
+```text
+Renewal
+→ payment fails
+→ subscription becomes PAST_DUE
+→ notification generated
+→ grace period
+→ eventual expiration
+```
+
+## Scenario 9: Admin plan creation
+
+```text
+Admin
+→ Create plan
+→ Configure limits
+→ Publish plan
+→ User sees plan
+→ New subscription receives correct entitlements
+```
+
+## Scenario 10: Support
+
+```text
+User:
+Payment deducted but subscription inactive
+
+→ Create ticket
+
+Support agent:
+→ sees account
+→ sees subscription
+→ sees payment
+→ investigates
+→ resolves ticket
+```
+
+---
+
+# 63. WHAT NOT TO DO
+
+Do NOT:
+
+* hard-code subscription plans
+* hard-code device limits
+* hard-code profile limits
+* store OTPs plaintext
+* store passwords plaintext
+* let services directly query another service's DB
+* send every playback second to PostgreSQL
+* make playback synchronously depend on analytics
+* make playback synchronously depend on trending
+* create Kafka topics for meaningless events
+* create 20 microservices on day one
+* introduce Kubernetes before the application works
+* build complex ML before collecting useful events
+* expose permanent video URLs
+* put secrets in Git
+* ignore idempotency
+* ignore event ordering
+* ignore observability
+* build an admin UI with a single ADMIN role
+* silently change existing subscription terms by mutating plans
+
+---
+
+# 64. ENGINEERING STYLE
+
+Code should be:
+
+* readable
+* idiomatic Java
+* strongly typed
+* properly layered
+* testable
+* documented where reasoning matters
+
+Prefer:
+
+```text
+Controller
+    ↓
+Application Service
+    ↓
+Domain Logic
+    ↓
+Repository
+```
+
+Do not create unnecessary abstractions.
+
+Avoid giant service classes.
+
+Avoid anemic "everything is a DTO" architecture.
+
+Use domain concepts where they genuinely improve correctness.
+
+---
+
+# 65. AI AGENT BEHAVIOR
+
+You are not allowed to blindly generate huge amounts of code.
+
+For each implementation phase:
+
+1. Explain the architecture.
+2. State assumptions.
+3. Show the relevant data model.
+4. Show API contracts.
+5. Show event contracts if applicable.
+6. Explain important design decisions.
+7. Implement the smallest coherent increment.
+8. Run tests/builds.
+9. Fix errors.
+10. Show how to manually verify the feature.
+11. Update documentation.
+12. Wait for the next phase unless explicitly instructed to continue.
+
+When something is ambiguous, identify the ambiguity and choose a sensible default rather than silently making a major architectural decision.
+
+Do not introduce a dependency unless there is a reason for it.
+
+When choosing between approaches, explain:
+
+```text
+Option A
+Option B
+Chosen option
+Why
+Tradeoffs
+```
+
+---
+
+# 66. FINAL QUALITY BAR
+
+The finished project should feel like a real distributed platform.
+
+It should be possible to explain:
+
+```text
+How authentication works.
+
+How profiles differ from accounts.
+
+How subscription entitlements work.
+
+How plans can be created without code changes.
+
+How plan versioning protects existing subscribers.
+
+How device limits work.
+
+How concurrent streaming limits work.
+
+How playback authorization works.
+
+How progress synchronizes between devices.
+
+How Kafka powers the event architecture.
+
+How trending is calculated.
+
+How recommendations work.
+
+How payments affect subscriptions.
+
+How financial reconciliation works.
+
+How reports are generated.
+
+How support works.
+
+How admin RBAC works.
+
+How audit logs work.
+
+How services behave when dependencies fail.
+
+How the system is observed.
+
+How the system scales.
+
+How the system would move from local Docker to AWS.
+```
+
+The implementation should prioritize **correct architecture and demonstrable engineering decisions over feature count**.
+
+Build the system incrementally, test every major capability, and keep the architecture understandable.
+
+The end result should be a serious portfolio project demonstrating that the developer understands not only how to write Spring Boot applications, but how to design, operate, and reason about a distributed system.
