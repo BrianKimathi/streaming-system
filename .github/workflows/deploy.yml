@@ -1,0 +1,33 @@
+name: Continuous Deployment (CD)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy StreamX to Production (Server: kim)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || 'ubuntu' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            echo "=========================================="
+            echo "Deploying StreamX Backend Microservices"
+            echo "=========================================="
+            cd /home/ubuntu/deployments/streaming-system
+            git pull origin main
+            cd backend
+            docker compose up --build -d
+            docker compose ps
+            echo "=========================================="
+            echo "StreamX Backend Deployed Successfully!"
+            echo "=========================================="

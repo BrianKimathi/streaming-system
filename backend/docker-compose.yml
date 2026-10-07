@@ -5,7 +5,7 @@ services:
     image: postgres:16-alpine
     container_name: streamx-postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
     environment:
       POSTGRES_USER: streamx
       POSTGRES_PASSWORD: streamx_password
@@ -23,7 +23,7 @@ services:
     image: redis:7-alpine
     container_name: streamx-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -34,7 +34,7 @@ services:
     image: confluentinc/cp-kafka:7.5.0
     container_name: streamx-kafka
     ports:
-      - "9092:9092"
+      - "${KAFKA_PORT:-9093}:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
@@ -55,7 +55,7 @@ services:
     build: ./auth-service
     container_name: streamx-auth-service
     ports:
-      - "8081:8081"
+      - "${AUTH_PORT:-18081}:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
     depends_on:
@@ -66,7 +66,7 @@ services:
     build: ./user-service
     container_name: streamx-user-service
     ports:
-      - "8082:8082"
+      - "${USER_PORT:-18082}:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
     depends_on:
@@ -77,7 +77,7 @@ services:
     build: ./catalog-service
     container_name: streamx-catalog-service
     ports:
-      - "8083:8083"
+      - "${CATALOG_PORT:-18083}:8083"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
     depends_on:
@@ -88,7 +88,7 @@ services:
     build: ./subscription-service
     container_name: streamx-subscription-service
     ports:
-      - "8084:8084"
+      - "${SUBSCRIPTION_PORT:-18084}:8084"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/subscription_db
     depends_on:
@@ -99,7 +99,7 @@ services:
     build: ./billing-service
     container_name: streamx-billing-service
     ports:
-      - "8085:8085"
+      - "${BILLING_PORT:-18085}:8085"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/billing_db
     depends_on:
@@ -110,7 +110,7 @@ services:
     build: ./device-service
     container_name: streamx-device-service
     ports:
-      - "8086:8086"
+      - "${DEVICE_PORT:-18086}:8086"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/device_db
     depends_on:
@@ -121,7 +121,7 @@ services:
     build: ./media-service
     container_name: streamx-media-service
     ports:
-      - "8087:8087"
+      - "${MEDIA_PORT:-18087}:8087"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/media_db
     depends_on:
@@ -132,7 +132,7 @@ services:
     build: ./playback-service
     container_name: streamx-playback-service
     ports:
-      - "8088:8088"
+      - "${PLAYBACK_PORT:-18088}:8088"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/playback_db
     depends_on:
@@ -143,7 +143,7 @@ services:
     build: ./watch-history-service
     container_name: streamx-watch-history-service
     ports:
-      - "8089:8089"
+      - "${WATCH_HISTORY_PORT:-18089}:8089"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/watch_history_db
     depends_on:
@@ -154,7 +154,7 @@ services:
     build: ./trending-service
     container_name: streamx-trending-service
     ports:
-      - "8090:8090"
+      - "${TRENDING_PORT:-18090}:8090"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trending_db
     depends_on:
@@ -165,7 +165,7 @@ services:
     build: ./analytics-service
     container_name: streamx-analytics-service
     ports:
-      - "8091:8091"
+      - "${ANALYTICS_PORT:-18091}:8091"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/analytics_db
     depends_on:
@@ -176,7 +176,7 @@ services:
     build: ./notification-service
     container_name: streamx-notification-service
     ports:
-      - "8092:8092"
+      - "${NOTIFICATION_PORT:-18092}:8092"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
     depends_on:
@@ -187,7 +187,7 @@ services:
     build: ./admin-service
     container_name: streamx-admin-service
     ports:
-      - "8093:8093"
+      - "${ADMIN_PORT:-18093}:8093"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/admin_db
     depends_on:
@@ -198,7 +198,7 @@ services:
     build: ./api-gateway
     container_name: streamx-api-gateway
     ports:
-      - "8080:8080"
+      - "${GATEWAY_PORT:-9080}:8080"
     environment:
       AUTH_SERVICE_URL: http://auth-service:8081
       USER_SERVICE_URL: http://user-service:8082
