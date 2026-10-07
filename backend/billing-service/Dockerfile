@@ -1,8 +1,6 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
-COPY pom.xml .
-COPY common ./common
-COPY billing-service ./billing-service
+COPY . .
 RUN mvn clean package -DskipTests -pl billing-service -am
 
 FROM eclipse-temurin:24-jre-alpine

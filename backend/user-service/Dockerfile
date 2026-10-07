@@ -1,8 +1,6 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
-COPY pom.xml .
-COPY common ./common
-COPY user-service ./user-service
+COPY . .
 RUN mvn clean package -DskipTests -pl user-service -am
 
 FROM eclipse-temurin:24-jre-alpine
