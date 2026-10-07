@@ -10,6 +10,9 @@ jobs:
   build-and-test:
     name: Build & Test Microservices
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
 
     steps:
       - name: Checkout Repository
@@ -62,6 +65,7 @@ jobs:
           cache: maven
 
       - name: Build JAR for ${{ matrix.service }}
+        working-directory: ./backend
         run: mvn package -pl ${{ matrix.service }} -am -DskipTests -B
 
       - name: Set up Docker Buildx
@@ -70,7 +74,7 @@ jobs:
       - name: Build Docker Image for ${{ matrix.service }}
         uses: docker/build-push-action@v5
         with:
-          context: ./${{ matrix.service }}
+          context: ./backend/${{ matrix.service }}
           push: false
           tags: streamx/${{ matrix.service }}:latest
 
@@ -87,4 +91,4 @@ jobs:
         uses: stefanprodan/kube-tools@v1
         with:
           command: |
-            kubectl apply --dry-run=client -f k8s/
+            kubectl apply --dry-run=client -f backend/k8s/
