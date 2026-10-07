@@ -1,0 +1,649 @@
+# --- Auth Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: streamx/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/auth_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: auth-service
+
+---
+# --- User Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: streamx/user-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/user_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8082
+      targetPort: 8082
+  selector:
+    app: user-service
+
+---
+# --- Catalog Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: streamx/catalog-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/catalog_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: catalog-service
+
+---
+# --- Subscription Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: subscription-service
+  template:
+    metadata:
+      labels:
+        app: subscription-service
+    spec:
+      containers:
+        - name: subscription-service
+          image: streamx/subscription-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/subscription_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8084
+      targetPort: 8084
+  selector:
+    app: subscription-service
+
+---
+# --- Billing Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+    spec:
+      containers:
+        - name: billing-service
+          image: streamx/billing-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/billing_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8085
+      targetPort: 8085
+  selector:
+    app: billing-service
+
+---
+# --- Device Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: device-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: device-service
+  template:
+    metadata:
+      labels:
+        app: device-service
+    spec:
+      containers:
+        - name: device-service
+          image: streamx/device-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/device_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: device-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8086
+      targetPort: 8086
+  selector:
+    app: device-service
+
+---
+# --- Media Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: media-service
+  template:
+    metadata:
+      labels:
+        app: media-service
+    spec:
+      containers:
+        - name: media-service
+          image: streamx/media-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8087
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/media_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8087
+      targetPort: 8087
+  selector:
+    app: media-service
+
+---
+# --- Playback Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: playback-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: playback-service
+  template:
+    metadata:
+      labels:
+        app: playback-service
+    spec:
+      containers:
+        - name: playback-service
+          image: streamx/playback-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8088
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/playback_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: playback-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8088
+      targetPort: 8088
+  selector:
+    app: playback-service
+
+---
+# --- Watch History Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: watch-history-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: watch-history-service
+  template:
+    metadata:
+      labels:
+        app: watch-history-service
+    spec:
+      containers:
+        - name: watch-history-service
+          image: streamx/watch-history-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8089
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/watch_history_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: watch-history-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8089
+      targetPort: 8089
+  selector:
+    app: watch-history-service
+
+---
+# --- Trending Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trending-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trending-service
+  template:
+    metadata:
+      labels:
+        app: trending-service
+    spec:
+      containers:
+        - name: trending-service
+          image: streamx/trending-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/trending_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trending-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8090
+      targetPort: 8090
+  selector:
+    app: trending-service
+
+---
+# --- Analytics Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+        - name: analytics-service
+          image: streamx/analytics-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8091
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/analytics_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8091
+      targetPort: 8091
+  selector:
+    app: analytics-service
+
+---
+# --- Notification Service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: streamx/notification-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8092
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://streamx-postgres:5432/notification_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamx-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: streamx-secret
+                  key: POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: streamx
+spec:
+  ports:
+    - port: 8092
+      targetPort: 8092
+  selector:
+    app: notification-service
+
+---
+# --- API Gateway ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: streamx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: streamx/api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8081"
+            - name: USER_SERVICE_URL
+              value: "http://user-service:8082"
+            - name: CATALOG_SERVICE_URL
+              value: "http://catalog-service:8083"
+            - name: SUBSCRIPTION_SERVICE_URL
+              value: "http://subscription-service:8084"
+            - name: BILLING_SERVICE_URL
+              value: "http://billing-service:8085"
+            - name: DEVICE_SERVICE_URL
+              value: "http://device-service:8086"
+            - name: MEDIA_SERVICE_URL
+              value: "http://media-service:8087"
+            - name: PLAYBACK_SERVICE_URL
+              value: "http://playback-service:8088"
+            - name: WATCH_HISTORY_SERVICE_URL
+              value: "http://watch-history-service:8089"
+            - name: TRENDING_SERVICE_URL
+              value: "http://trending-service:8090"
+            - name: ANALYTICS_SERVICE_URL
+              value: "http://analytics-service:8091"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8092"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: streamx
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  selector:
+    app: api-gateway

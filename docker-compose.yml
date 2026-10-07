@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -42,13 +44,167 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
       KAFKA_LISTENERS: 'PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+  auth-service:
+    build: ./auth-service
+    container_name: streamx-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  user-service:
+    build: ./user-service
+    container_name: streamx-user-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog-service:
+    build: ./catalog-service
+    container_name: streamx-catalog-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  subscription-service:
+    build: ./subscription-service
+    container_name: streamx-subscription-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/subscription_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  billing-service:
+    build: ./billing-service
+    container_name: streamx-billing-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/billing_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  device-service:
+    build: ./device-service
+    container_name: streamx-device-service
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/device_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  media-service:
+    build: ./media-service
+    container_name: streamx-media-service
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/media_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  playback-service:
+    build: ./playback-service
+    container_name: streamx-playback-service
+    ports:
+      - "8088:8088"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/playback_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  watch-history-service:
+    build: ./watch-history-service
+    container_name: streamx-watch-history-service
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/watch_history_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  trending-service:
+    build: ./trending-service
+    container_name: streamx-trending-service
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trending_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: streamx-analytics-service
+    ports:
+      - "8091:8091"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/analytics_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notification-service:
+    build: ./notification-service
+    container_name: streamx-notification-service
+    ports:
+      - "8092:8092"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: streamx-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+      USER_SERVICE_URL: http://user-service:8082
+      CATALOG_SERVICE_URL: http://catalog-service:8083
+      SUBSCRIPTION_SERVICE_URL: http://subscription-service:8084
+      BILLING_SERVICE_URL: http://billing-service:8085
+      DEVICE_SERVICE_URL: http://device-service:8086
+      MEDIA_SERVICE_URL: http://media-service:8087
+      PLAYBACK_SERVICE_URL: http://playback-service:8088
+      WATCH_HISTORY_SERVICE_URL: http://watch-history-service:8089
+      TRENDING_SERVICE_URL: http://trending-service:8090
+      ANALYTICS_SERVICE_URL: http://analytics-service:8091
+      NOTIFICATION_SERVICE_URL: http://notification-service:8092
+    depends_on:
+      - auth-service
+      - user-service
+      - catalog-service
 
 volumes:
   postgres_data:
