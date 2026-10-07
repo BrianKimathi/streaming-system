@@ -1,5 +1,12 @@
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+WORKDIR /build
+COPY pom.xml .
+COPY common ./common
+COPY api-gateway ./api-gateway
+RUN mvn clean package -DskipTests -pl api-gateway -am
+
 FROM eclipse-temurin:24-jre-alpine
 WORKDIR /app
-COPY target/api-gateway-1.0.0-SNAPSHOT.jar app.jar
+COPY --from=builder /build/api-gateway/target/api-gateway-1.0.0-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

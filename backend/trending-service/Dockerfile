@@ -1,5 +1,12 @@
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+WORKDIR /build
+COPY pom.xml .
+COPY common ./common
+COPY trending-service ./trending-service
+RUN mvn clean package -DskipTests -pl trending-service -am
+
 FROM eclipse-temurin:24-jre-alpine
 WORKDIR /app
-COPY target/trending-service-1.0.0-SNAPSHOT.jar app.jar
+COPY --from=builder /build/trending-service/target/trending-service-1.0.0-SNAPSHOT.jar app.jar
 EXPOSE 8090
 ENTRYPOINT ["java", "-jar", "app.jar"]

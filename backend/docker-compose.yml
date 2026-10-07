@@ -52,7 +52,9 @@ services:
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
   auth-service:
-    build: ./auth-service
+    build:
+      context: .
+      dockerfile: ./auth-service/Dockerfile
     container_name: streamx-auth-service
     ports:
       - "${AUTH_PORT:-18081}:8081"
@@ -63,7 +65,9 @@ services:
         condition: service_healthy
 
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: ./user-service/Dockerfile
     container_name: streamx-user-service
     ports:
       - "${USER_PORT:-18082}:8082"
@@ -74,7 +78,9 @@ services:
         condition: service_healthy
 
   catalog-service:
-    build: ./catalog-service
+    build:
+      context: .
+      dockerfile: ./catalog-service/Dockerfile
     container_name: streamx-catalog-service
     ports:
       - "${CATALOG_PORT:-18083}:8083"
@@ -85,7 +91,9 @@ services:
         condition: service_healthy
 
   subscription-service:
-    build: ./subscription-service
+    build:
+      context: .
+      dockerfile: ./subscription-service/Dockerfile
     container_name: streamx-subscription-service
     ports:
       - "${SUBSCRIPTION_PORT:-18084}:8084"
@@ -96,7 +104,9 @@ services:
         condition: service_healthy
 
   billing-service:
-    build: ./billing-service
+    build:
+      context: .
+      dockerfile: ./billing-service/Dockerfile
     container_name: streamx-billing-service
     ports:
       - "${BILLING_PORT:-18085}:8085"
@@ -107,7 +117,9 @@ services:
         condition: service_healthy
 
   device-service:
-    build: ./device-service
+    build:
+      context: .
+      dockerfile: ./device-service/Dockerfile
     container_name: streamx-device-service
     ports:
       - "${DEVICE_PORT:-18086}:8086"
@@ -118,7 +130,9 @@ services:
         condition: service_healthy
 
   media-service:
-    build: ./media-service
+    build:
+      context: .
+      dockerfile: ./media-service/Dockerfile
     container_name: streamx-media-service
     ports:
       - "${MEDIA_PORT:-18087}:8087"
@@ -129,7 +143,9 @@ services:
         condition: service_healthy
 
   playback-service:
-    build: ./playback-service
+    build:
+      context: .
+      dockerfile: ./playback-service/Dockerfile
     container_name: streamx-playback-service
     ports:
       - "${PLAYBACK_PORT:-18088}:8088"
@@ -140,7 +156,9 @@ services:
         condition: service_healthy
 
   watch-history-service:
-    build: ./watch-history-service
+    build:
+      context: .
+      dockerfile: ./watch-history-service/Dockerfile
     container_name: streamx-watch-history-service
     ports:
       - "${WATCH_HISTORY_PORT:-18089}:8089"
@@ -151,7 +169,9 @@ services:
         condition: service_healthy
 
   trending-service:
-    build: ./trending-service
+    build:
+      context: .
+      dockerfile: ./trending-service/Dockerfile
     container_name: streamx-trending-service
     ports:
       - "${TRENDING_PORT:-18090}:8090"
@@ -162,7 +182,9 @@ services:
         condition: service_healthy
 
   analytics-service:
-    build: ./analytics-service
+    build:
+      context: .
+      dockerfile: ./analytics-service/Dockerfile
     container_name: streamx-analytics-service
     ports:
       - "${ANALYTICS_PORT:-18091}:8091"
@@ -173,7 +195,9 @@ services:
         condition: service_healthy
 
   notification-service:
-    build: ./notification-service
+    build:
+      context: .
+      dockerfile: ./notification-service/Dockerfile
     container_name: streamx-notification-service
     ports:
       - "${NOTIFICATION_PORT:-18092}:8092"
@@ -184,7 +208,9 @@ services:
         condition: service_healthy
 
   admin-service:
-    build: ./admin-service
+    build:
+      context: .
+      dockerfile: ./admin-service/Dockerfile
     container_name: streamx-admin-service
     ports:
       - "${ADMIN_PORT:-18093}:8093"
@@ -195,7 +221,9 @@ services:
         condition: service_healthy
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
     container_name: streamx-api-gateway
     ports:
       - "${GATEWAY_PORT:-9080}:8080"
