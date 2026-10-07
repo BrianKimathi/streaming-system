@@ -7,3 +7,6 @@ CREATE DATABASE device_db;
 CREATE DATABASE media_db;
 CREATE DATABASE playback_db;
 CREATE DATABASE watch_history_db;
+CREATE DATABASE trending_db;
+CREATE DATABASE analytics_db;
+CREATE DATABASE notification_db;

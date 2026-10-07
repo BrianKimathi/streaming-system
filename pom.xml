@@ -38,6 +38,9 @@
         <module>media-service</module>
         <module>playback-service</module>
         <module>watch-history-service</module>
+        <module>trending-service</module>
+        <module>analytics-service</module>
+        <module>notification-service</module>
         <module>api-gateway</module>
     </modules>
 

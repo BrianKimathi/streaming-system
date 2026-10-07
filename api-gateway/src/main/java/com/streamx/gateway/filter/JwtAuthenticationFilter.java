@@ -32,7 +32,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/phone/verify-otp",
             "/api/v1/catalog/movies",
             "/api/v1/catalog/genres",
-            "/api/v1/subscriptions/plans"
+            "/api/v1/subscriptions/plans",
+            "/api/v1/trending"
     );
 
     public JwtAuthenticationFilter(
