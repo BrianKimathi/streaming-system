@@ -25,8 +25,11 @@ public class Movie {
     private LocalDate releaseDate;
     private Integer runtimeMinutes;
     private String maturityRating;
+    @Column(length = 2000)
     private String posterUrl;
+    @Column(length = 2000)
     private String backdropUrl;
+    @Column(length = 2000)
     private String trailerUrl;
     private String mediaAssetUrl;
 

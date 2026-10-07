@@ -13,9 +13,9 @@ public record CreateTvShowRequest(
         String synopsis,
         LocalDate releaseDate,
         String maturityRating,
-        String posterUrl,
-        String backdropUrl,
-        String trailerUrl,
+        @MediaUrl String posterUrl,
+        @MediaUrl String backdropUrl,
+        @MediaUrl String trailerUrl,
         ContentStatus status,
         Set<String> genreIds,
         @Min(value = 0, message = "Seasons count cannot be negative")

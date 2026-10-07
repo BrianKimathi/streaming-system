@@ -14,10 +14,12 @@ import com.streamx.billing.dto.CheckoutRequest;
 import com.streamx.billing.dto.PaymentTransactionResponse;
 import com.streamx.billing.exception.BadGatewayException;
 import com.streamx.billing.exception.ServiceUnavailableException;
+import com.streamx.billing.mpesa.MpesaConfigProvider;
 import com.streamx.billing.mpesa.MpesaException;
 import com.streamx.billing.mpesa.MpesaGateway;
 import com.streamx.billing.mpesa.StkPushResult;
 import com.streamx.billing.mpesa.StkQueryResult;
+import com.streamx.billing.repository.MpesaSettingsRepository;
 import com.streamx.billing.repository.PaymentTransactionRepository;
 import com.streamx.common.exception.BadRequestException;
 import com.streamx.common.exception.ResourceNotFoundException;
@@ -65,6 +67,12 @@ class BillingServiceTest {
     @Autowired
     private MpesaProperties mpesaProperties;
 
+    @Autowired
+    private MpesaSettingsRepository settingsRepository;
+
+    @Autowired
+    private MpesaConfigProvider mpesaConfigProvider;
+
     @MockitoBean
     private MpesaGateway mpesaGateway;
 
@@ -83,6 +91,8 @@ class BillingServiceTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
+        settingsRepository.deleteAll();
+        mpesaConfigProvider.invalidate();
         originalConsumerKey = mpesaProperties.getConsumerKey();
         accountId = UUID.randomUUID();
         planId = UUID.randomUUID();
@@ -91,6 +101,7 @@ class BillingServiceTest {
     @AfterEach
     void restoreProperties() {
         mpesaProperties.setConsumerKey(originalConsumerKey);
+        mpesaConfigProvider.invalidate();
     }
 
     private void stubPlan(String price, String currency, boolean active) {
@@ -170,6 +181,7 @@ class BillingServiceTest {
     @Test
     void checkoutWithoutMpesaConfigurationIs503() {
         mpesaProperties.setConsumerKey("");
+        mpesaConfigProvider.invalidate();
 
         ServiceUnavailableException ex = assertThrows(ServiceUnavailableException.class, () -> billingService.checkout(
                 accountId.toString(), new CheckoutRequest(planId.toString(), "0712345678")));

@@ -1,3 +1,4 @@
+import '../../core/config/app_config.dart';
 import '../../core/utils/json.dart';
 
 class Genre {
@@ -69,10 +70,7 @@ class CatalogTitle {
   bool get isSeries => kind == TitleKind.series;
   int? get year => releaseDate?.year;
 
-  static String? _url(Object? v) {
-    final s = str(v)?.trim();
-    return s == null || s.isEmpty ? null : s;
-  }
+  static String? _url(Object? v) => AppConfig.resolveMediaUrl(str(v));
 
   factory CatalogTitle.movieFromJson(Json json) => CatalogTitle(
         id: reqStr(json, 'id'),
@@ -136,7 +134,6 @@ class Episode {
   String get label => 'S${seasonNumber ?? '?'}:E${episodeNumber ?? '?'}';
 
   factory Episode.fromJson(Json json) {
-    final thumb = str(json['thumbnailUrl'])?.trim();
     return Episode(
       id: reqStr(json, 'id'),
       seasonId: str(json['seasonId']),
@@ -147,7 +144,7 @@ class Episode {
       synopsis: str(json['synopsis']),
       runtimeMinutes: intOrNull(json['runtimeMinutes']),
       releaseDate: dateOrNull(json['releaseDate']),
-      thumbnailUrl: thumb == null || thumb.isEmpty ? null : thumb,
+      thumbnailUrl: AppConfig.resolveMediaUrl(str(json['thumbnailUrl'])),
     );
   }
 }
@@ -206,7 +203,7 @@ class Season {
       title: str(json['title']),
       synopsis: str(json['synopsis']),
       releaseDate: dateOrNull(json['releaseDate']),
-      posterUrl: str(json['posterUrl']),
+      posterUrl: AppConfig.resolveMediaUrl(str(json['posterUrl'])),
       episodes: List.unmodifiable(episodes),
     );
   }

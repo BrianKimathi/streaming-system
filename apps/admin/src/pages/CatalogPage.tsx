@@ -1,19 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Film, ListVideo, Plus, RefreshCw, Search, Tag, Tv } from 'lucide-react';
+import { CheckCircle2, Film, ListVideo, Pencil, Plus, RefreshCw, Search, Tag, Tv } from 'lucide-react';
 import { adminService, audit } from '../services/adminService';
 import { errorMessage } from '../api/client';
 import { CONTENT_STATUSES } from '../types';
-import type { CatalogStats, ContentStatus, Genre, Movie, TVShow } from '../types';
+import type { CatalogStats, ContentStatus, Genre, MediaAsset, Movie, TVShow } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { StatCard } from '../components/common/StatCard';
 import { EmptyState, ErrorBanner, LoadingState, SuccessBanner } from '../components/common/Feedback';
+import { assetStatusLabel, latestAssetByContent } from '../components/common/VideoUpload';
+import type { PendingVideo } from '../components/media/VideoSourceInput';
 import { formatDate, formatDateTime, formatNumber } from '../utils/format';
 import { CreateMoviePage } from './CreateMoviePage';
 import { CreateTvShowPage } from './CreateTvShowPage';
+import { EditMoviePage } from './EditMoviePage';
+import { EditTvShowPage } from './EditTvShowPage';
 import { TvShowEpisodesPage } from './TvShowEpisodesPage';
 
 type SubTab = 'movies' | 'tvshows';
-type ViewMode = 'list' | 'create-movie' | 'create-tvshow' | 'manage-episodes';
+type ViewMode = 'list' | 'create-movie' | 'create-tvshow' | 'edit-movie' | 'edit-tvshow' | 'manage-episodes';
+
+const ROW_BUTTON =
+  'flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] font-semibold whitespace-nowrap transition disabled:opacity-50';
 
 interface CatalogRow {
   id: string;
@@ -67,6 +74,20 @@ export const CatalogPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ContentStatus | ''>('');
   const [managedShow, setManagedShow] = useState<TVShow | null>(null);
+  const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+  const [editingShow, setEditingShow] = useState<TVShow | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<PendingVideo | null>(null);
+  const [assets, setAssets] = useState<MediaAsset[] | null>(null);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+
+  const loadAssets = useCallback(async () => {
+    try {
+      setAssets(await adminService.getMediaAssets());
+      setAssetsError(null);
+    } catch (err) {
+      setAssetsError(errorMessage(err, 'Failed to load video status'));
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     try {
@@ -89,8 +110,19 @@ export const CatalogPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-    await loadStats();
-  }, [loadStats]);
+    await Promise.all([loadStats(), loadAssets()]);
+  }, [loadStats, loadAssets]);
+
+  const latestAssets = useMemo(() => (assets ? latestAssetByContent(assets) : null), [assets]);
+
+  const backToList = (tab: SubTab) => {
+    setEditingMovie(null);
+    setEditingShow(null);
+    setManagedShow(null);
+    setPendingVideo(null);
+    setActiveSubTab(tab);
+    setViewMode('list');
+  };
 
   useEffect(() => {
     load();
@@ -146,13 +178,52 @@ export const CatalogPage: React.FC = () => {
     return (
       <CreateMoviePage
         onCancel={() => setViewMode('list')}
-        onDone={(movie) => {
+        onDone={(movie, video) => {
           setMovies((list) => [movie, ...list.filter((m) => m.id !== movie.id)]);
           setActiveSubTab('movies');
-          setViewMode('list');
           setActionError(null);
           setSuccess(`Movie "${movie.title}" created with status ${movie.status}.`);
+          setPendingVideo(video);
+          setEditingMovie(movie);
+          setViewMode('edit-movie');
           loadStats();
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'edit-movie' && editingMovie) {
+    return (
+      <EditMoviePage
+        key={editingMovie.id}
+        movie={editingMovie}
+        pendingVideo={pendingVideo}
+        onSaved={(movie) => {
+          setMovies((list) => list.map((m) => (m.id === movie.id ? movie : m)));
+          loadStats();
+        }}
+        onBack={() => {
+          backToList('movies');
+          loadAssets();
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'edit-tvshow' && editingShow) {
+    return (
+      <EditTvShowPage
+        key={editingShow.id}
+        show={editingShow}
+        onSaved={(show) => {
+          setTvShows((list) => list.map((s) => (s.id === show.id ? show : s)));
+          loadStats();
+        }}
+        onBack={() => backToList('tvshows')}
+        onManageEpisodes={(show) => {
+          setEditingShow(null);
+          setManagedShow(show);
+          setViewMode('manage-episodes');
         }}
       />
     );
@@ -179,9 +250,7 @@ export const CatalogPage: React.FC = () => {
       <TvShowEpisodesPage
         show={managedShow}
         onBack={() => {
-          setManagedShow(null);
-          setViewMode('list');
-          setActiveSubTab('tvshows');
+          backToList('tvshows');
           load();
         }}
       />
@@ -190,6 +259,25 @@ export const CatalogPage: React.FC = () => {
 
   const isMovies = activeSubTab === 'movies';
   const totalForTab = isMovies ? movies.length : tvShows.length;
+
+  const renderVideoCell = (movieId: string) => {
+    if (!latestAssets) {
+      return (
+        <span className="text-slate-500" title={assetsError ?? undefined}>
+          {assetsError ? 'Status unavailable' : 'Checking…'}
+        </span>
+      );
+    }
+    const asset = latestAssets.get(movieId);
+    if (!asset) return <span className="text-slate-500">No video</span>;
+    const label = assetStatusLabel(asset);
+    return (
+      <div className="space-y-1">
+        <StatusBadge status={asset.status} />
+        {label && <p className="text-[10px] text-amber-300">{label}</p>}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -327,8 +415,9 @@ export const CatalogPage: React.FC = () => {
                   <th className="px-6 py-4">Release Date</th>
                   <th className="px-6 py-4">{isMovies ? 'Runtime' : 'Seasons'}</th>
                   <th className="px-6 py-4">Status</th>
+                  {isMovies && <th className="px-6 py-4">Video</th>}
                   <th className="px-6 py-4">Created</th>
-                  <th className="px-6 py-4 text-right">{isMovies ? 'Change Status' : 'Status & Episodes'}</th>
+                  <th className="px-6 py-4 text-right">{isMovies ? 'Status & Actions' : 'Status & Episodes'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
@@ -373,6 +462,7 @@ export const CatalogPage: React.FC = () => {
                       <td className="px-6 py-3">
                         <StatusBadge status={row.status} />
                       </td>
+                      {isMovies && <td className="px-6 py-3">{renderVideoCell(row.id)}</td>}
                       <td className="px-6 py-3 text-slate-400 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-2">
@@ -390,6 +480,29 @@ export const CatalogPage: React.FC = () => {
                               </option>
                             ))}
                           </select>
+                          <button
+                            onClick={() => {
+                              setActionError(null);
+                              setSuccess(null);
+                              if (isMovies) {
+                                const movie = movies.find((m) => m.id === row.id);
+                                if (!movie) return;
+                                setPendingVideo(null);
+                                setEditingMovie(movie);
+                                setViewMode('edit-movie');
+                              } else {
+                                const show = tvShows.find((s) => s.id === row.id);
+                                if (!show) return;
+                                setEditingShow(show);
+                                setViewMode('edit-tvshow');
+                              }
+                            }}
+                            disabled={pending}
+                            className={ROW_BUTTON}
+                          >
+                            <Pencil className="w-3 h-3" />
+                            {isMovies ? 'Edit & video' : 'Edit'}
+                          </button>
                           {!isMovies && (
                             <button
                               onClick={() => {
@@ -401,7 +514,7 @@ export const CatalogPage: React.FC = () => {
                                 setViewMode('manage-episodes');
                               }}
                               disabled={pending}
-                              className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] font-semibold whitespace-nowrap transition disabled:opacity-50"
+                              className={ROW_BUTTON}
                             >
                               <ListVideo className="w-3 h-3" />
                               Manage episodes

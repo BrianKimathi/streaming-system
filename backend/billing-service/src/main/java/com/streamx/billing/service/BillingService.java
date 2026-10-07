@@ -5,7 +5,6 @@ import com.streamx.billing.client.ActivatedSubscription;
 import com.streamx.billing.client.NotificationClient;
 import com.streamx.billing.client.PlanDetails;
 import com.streamx.billing.client.SubscriptionClient;
-import com.streamx.billing.config.MpesaProperties;
 import com.streamx.billing.domain.PaymentStatus;
 import com.streamx.billing.domain.PaymentTransaction;
 import com.streamx.billing.dto.AdminPaymentTransactionResponse;
@@ -13,6 +12,7 @@ import com.streamx.billing.dto.CheckoutRequest;
 import com.streamx.billing.dto.PaymentTransactionResponse;
 import com.streamx.billing.exception.BadGatewayException;
 import com.streamx.billing.exception.ServiceUnavailableException;
+import com.streamx.billing.mpesa.MpesaConfigProvider;
 import com.streamx.billing.mpesa.MpesaException;
 import com.streamx.billing.mpesa.MpesaGateway;
 import com.streamx.billing.mpesa.StkPushResult;
@@ -64,20 +64,20 @@ public class BillingService {
     private static final DateTimeFormatter HUMAN_DATE = DateTimeFormatter.ofPattern("d MMM yyyy");
 
     private final PaymentTransactionRepository transactionRepository;
-    private final MpesaProperties mpesaProperties;
+    private final MpesaConfigProvider mpesaConfigProvider;
     private final MpesaGateway mpesaGateway;
     private final SubscriptionClient subscriptionClient;
     private final NotificationClient notificationClient;
     private final TransactionTemplate transactionTemplate;
 
     public BillingService(PaymentTransactionRepository transactionRepository,
-                          MpesaProperties mpesaProperties,
+                          MpesaConfigProvider mpesaConfigProvider,
                           MpesaGateway mpesaGateway,
                           SubscriptionClient subscriptionClient,
                           NotificationClient notificationClient,
                           PlatformTransactionManager transactionManager) {
         this.transactionRepository = transactionRepository;
-        this.mpesaProperties = mpesaProperties;
+        this.mpesaConfigProvider = mpesaConfigProvider;
         this.mpesaGateway = mpesaGateway;
         this.subscriptionClient = subscriptionClient;
         this.notificationClient = notificationClient;
@@ -88,7 +88,7 @@ public class BillingService {
 
     public PaymentTransactionResponse checkout(String accountIdStr, CheckoutRequest request) {
         UUID accountId = parseAccountId(accountIdStr);
-        if (!mpesaProperties.isConfigured()) {
+        if (!mpesaConfigProvider.current().isConfigured()) {
             throw new ServiceUnavailableException(NOT_CONFIGURED_MESSAGE);
         }
         String phone = PhoneNumbers.normalize(request.getPhoneNumber())
@@ -168,11 +168,11 @@ public class BillingService {
     }
 
     boolean isValidCallbackToken(String token) {
-        String expected = mpesaProperties.getCallbackToken();
+        String expected = mpesaConfigProvider.current().callbackToken();
         if (expected == null || expected.isBlank() || token == null) {
             return false;
         }
-        return MessageDigest.isEqual(expected.trim().getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
     }
 
     private void processCallback(JsonNode payload) {
@@ -260,7 +260,7 @@ public class BillingService {
 
     void reconcile(PaymentTransaction txn) {
         PaymentOutcome outcome = null;
-        if (txn.getCheckoutRequestId() != null && mpesaProperties.isConfigured()) {
+        if (txn.getCheckoutRequestId() != null && mpesaConfigProvider.current().isConfigured()) {
             try {
                 StkQueryResult result = mpesaGateway.queryStkPush(txn.getCheckoutRequestId());
                 if (!result.pending()) {

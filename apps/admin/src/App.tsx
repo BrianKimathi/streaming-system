@@ -17,6 +17,7 @@ import { AuditLogsPage } from './pages/AuditLogsPage';
 import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
 import { OperationsHealthPage } from './pages/OperationsHealthPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PaymentsSettingsPage } from './pages/PaymentsSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 
 const MainLayout: React.FC = () => {
@@ -59,6 +60,8 @@ const MainLayout: React.FC = () => {
         return 'Operations & Service Health';
       case 'settings':
         return 'Settings';
+      case 'payments':
+        return 'Settings · Payments (M-Pesa)';
       default:
         return 'Control Center';
     }
@@ -95,7 +98,9 @@ const MainLayout: React.FC = () => {
       case 'ops-health':
         return <OperationsHealthPage />;
       case 'settings':
-        return <SettingsPage />;
+        return <SettingsPage onNavigate={setCurrentTab} />;
+      case 'payments':
+        return <PaymentsSettingsPage />;
       default:
         return <DashboardPage />;
     }

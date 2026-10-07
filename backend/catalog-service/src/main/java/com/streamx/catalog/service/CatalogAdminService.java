@@ -46,12 +46,43 @@ public class CatalogAdminService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public MovieResponse getMovie(String id) {
+        return mapper.toMovieResponse(findMovie(id));
+    }
+
     @Transactional
     public MovieResponse updateMovieStatus(String id, ContentStatus status) {
-        Movie movie = movieRepository.findById(CatalogIds.parse(id))
-                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + id));
+        Movie movie = findMovie(id);
         movie.setStatus(status);
         return mapper.toMovieResponse(movieRepository.save(movie));
+    }
+
+    /** Full replacement: omitted optional fields are cleared. */
+    @Transactional
+    public MovieResponse updateMovie(String id, CreateMovieRequest request) {
+        Movie movie = findMovie(id);
+        if (request.getRuntimeMinutes() != null) {
+            requirePositive(request.getRuntimeMinutes(), "Runtime");
+        }
+        movie.setTitle(request.getTitle().trim());
+        movie.setSynopsis(blankToNull(request.getSynopsis()));
+        movie.setReleaseDate(request.getReleaseDate());
+        movie.setRuntimeMinutes(request.getRuntimeMinutes());
+        movie.setMaturityRating(blankToNull(request.getMaturityRating()));
+        movie.setPosterUrl(blankToNull(request.getPosterUrl()));
+        movie.setBackdropUrl(blankToNull(request.getBackdropUrl()));
+        movie.setTrailerUrl(blankToNull(request.getTrailerUrl()));
+        if (request.getStatus() != null) {
+            movie.setStatus(request.getStatus());
+        }
+        movie.setGenres(resolveGenres(request.getGenreIds()));
+        return mapper.toMovieResponse(movieRepository.save(movie));
+    }
+
+    @Transactional
+    public void deleteMovie(String id) {
+        movieRepository.delete(findMovie(id));
     }
 
     // --- TV shows ---
@@ -96,6 +127,34 @@ public class CatalogAdminService {
         TvShow show = findShow(id);
         show.setStatus(status);
         return tvShowAssembler.toResponse(tvShowRepository.save(show));
+    }
+
+    /** Full replacement of the show's own fields; seasons are managed separately and seasonsCount is ignored. */
+    @Transactional
+    public TvShowResponse updateTvShow(String id, CreateTvShowRequest request) {
+        TvShow show = findShow(id);
+        show.setTitle(request.title().trim());
+        show.setSynopsis(blankToNull(request.synopsis()));
+        show.setReleaseDate(request.releaseDate());
+        show.setMaturityRating(blankToNull(request.maturityRating()));
+        show.setPosterUrl(blankToNull(request.posterUrl()));
+        show.setBackdropUrl(blankToNull(request.backdropUrl()));
+        show.setTrailerUrl(blankToNull(request.trailerUrl()));
+        if (request.status() != null) {
+            show.setStatus(request.status());
+        }
+        show.setGenres(resolveGenres(request.genreIds()));
+        return tvShowAssembler.toResponse(tvShowRepository.save(show));
+    }
+
+    @Transactional
+    public void deleteTvShow(String id) {
+        TvShow show = findShow(id);
+        for (Season season : seasonRepository.findByTvShowIdOrderBySeasonNumberAsc(show.getId())) {
+            episodeRepository.deleteBySeasonId(season.getId());
+            seasonRepository.delete(season);
+        }
+        tvShowRepository.delete(show);
     }
 
     // --- Seasons ---
@@ -210,6 +269,11 @@ public class CatalogAdminService {
         episode.setRuntimeMinutes(request.runtimeMinutes());
         episode.setReleaseDate(request.releaseDate());
         episode.setThumbnailUrl(blankToNull(request.thumbnailUrl()));
+    }
+
+    private Movie findMovie(String id) {
+        return movieRepository.findById(CatalogIds.parse(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + id));
     }
 
     private TvShow findShow(String id) {

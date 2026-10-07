@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Flag,
   Activity,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { humanizeRole } from '../../utils/format';
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
     { id: 'ops-health', label: 'Ops Health & Cluster', icon: Activity },
     { id: 'notifications', label: 'Notifications Log', icon: Bell },
     { id: 'settings', label: 'System Settings', icon: Sliders },
+    { id: 'payments', label: 'Payments (M-Pesa)', icon: Wallet },
   ];
 
   return (

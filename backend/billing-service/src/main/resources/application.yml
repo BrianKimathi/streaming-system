@@ -33,6 +33,12 @@ mpesa:
   callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://streamxapi.briankimathi.dev/api/v1/billing/mpesa/callback}
   callback-token: ${MPESA_CALLBACK_TOKEN:}
 
+# Admins can override the mpesa.* values above from the admin panel (table mpesa_settings). Secrets stored there are
+# AES-256-GCM encrypted with SHA-256(SETTINGS_ENCRYPTION_KEY); when empty, the key is derived from JWT_SECRET.
+billing:
+  settings:
+    encryption-key: ${SETTINGS_ENCRYPTION_KEY:}
+
 services:
   subscription-url: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8084}
   notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8092}

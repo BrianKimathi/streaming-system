@@ -1,37 +1,49 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, FileVideo, HardDrive, Loader2, RefreshCw, RotateCcw, UploadCloud } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Eye,
+  FileVideo,
+  Film,
+  HardDrive,
+  Image as ImageIcon,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  UploadCloud,
+} from 'lucide-react';
 import { adminService, audit } from '../services/adminService';
-import { API_BASE_URL, errorMessage } from '../api/client';
-import type { Episode, MediaAsset, MediaStats, Movie, TVShow } from '../types';
+import { errorMessage } from '../api/client';
+import type { Episode, MediaAsset, MediaFile, MediaStats, Movie, Page, TVShow, UploadPurpose } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { StatCard } from '../components/common/StatCard';
+import { Modal } from '../components/common/Modal';
 import { EmptyState, ErrorBanner, LoadingState, SuccessBanner } from '../components/common/Feedback';
-import {
-  MEDIA_POLL_INTERVAL_MS,
-  UploadLimitsNote,
-  UploadProgressBar,
-  isAssetActive as isActive,
-  oversizeError,
-} from '../components/common/VideoUpload';
+import { MEDIA_POLL_INTERVAL_MS, ProgressBar, assetStatusLabel, isAssetActive as isActive } from '../components/common/VideoUpload';
+import { HlsPlayer } from '../components/media/HlsPlayer';
+import { VideoSourceInput } from '../components/media/VideoSourceInput';
 import { formatBytes, formatDateTime, formatDuration, formatNumber, shortId } from '../utils/format';
+import { resolveApiUrl } from '../utils/media';
 
 const SHOW_DETAIL_CONCURRENCY = 4;
 const LOOKUP_BATCH = 100;
+const FILES_PAGE_SIZE = 20;
+
+const BUTTON_SECONDARY =
+  'flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] font-semibold whitespace-nowrap transition disabled:opacity-50';
+const BUTTON_DANGER =
+  'flex items-center gap-1.5 px-2.5 py-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[11px] font-semibold whitespace-nowrap transition disabled:opacity-50';
+const TAB_CLASS = (active: boolean) =>
+  `px-3 py-1.5 rounded-lg text-[11px] font-semibold transition ${
+    active ? 'bg-red-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+  }`;
 
 function episodeLabel(showTitle: string | undefined, episode: Episode): string {
   return `${showTitle ?? 'Unknown show'} · S${episode.seasonNumber}E${episode.episodeNumber} · ${episode.title}`;
-}
-
-const API_ORIGIN = (() => {
-  try {
-    return new URL(API_BASE_URL, window.location.origin).origin;
-  } catch {
-    return '';
-  }
-})();
-
-function playlistHref(path: string): string {
-  return /^https?:\/\//i.test(path) ? path : `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 export const MediaPipelinePage: React.FC = () => {
@@ -56,17 +68,19 @@ export const MediaPipelinePage: React.FC = () => {
   const rerunRequestedRef = useRef(false);
   const aliveRef = useRef(true);
 
-  const [contentId, setContentId] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [movieId, setMovieId] = useState('');
 
-  const [retryingIds, setRetryingIds] = useState<string[]>([]);
+  const [busyAssetIds, setBusyAssetIds] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ title: string; url: string } | null>(null);
+
+  const [filePurpose, setFilePurpose] = useState<UploadPurpose | ''>('');
+  const [filePage, setFilePage] = useState(0);
+  const [files, setFiles] = useState<Page<MediaFile> | null>(null);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [deletingFileIds, setDeletingFileIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
@@ -108,10 +122,26 @@ export const MediaPipelinePage: React.FC = () => {
     }
   }, []);
 
+  const loadFiles = useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      setFiles(await adminService.getMediaFiles({ purpose: filePurpose || undefined, page: filePage, size: FILES_PAGE_SIZE }));
+      setFilesError(null);
+    } catch (err) {
+      setFilesError(errorMessage(err, 'Failed to load uploaded files'));
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [filePurpose, filePage]);
+
   useEffect(() => {
     loadAssets(false);
     loadTitles();
   }, [loadAssets, loadTitles]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -223,48 +253,21 @@ export const MediaPipelinePage: React.FC = () => {
     return map;
   }, [movies, shows, episodeLabels]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0] ?? null;
-    setUploadError(null);
-    setUploadSuccess(null);
-    const tooLarge = selected ? oversizeError(selected) : null;
-    if (tooLarge) {
-      setUploadError(tooLarge);
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-    setFile(selected);
-  };
+  const selectedMovie = movies.find((m) => m.id === movieId) ?? null;
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contentId || !file) return;
-    setUploading(true);
-    setProgress(0);
-    setUploadError(null);
-    setUploadSuccess(null);
-    try {
-      const asset = await adminService.uploadMedia(contentId, file, setProgress);
-      setAssets((list) => [asset, ...list.filter((a) => a.id !== asset.id)]);
-      audit({ action: 'MEDIA_UPLOADED', targetType: 'MEDIA', targetId: contentId, details: file.name });
-      setUploadSuccess(
-        `Uploaded "${file.name}" for ${titleById.get(contentId) ?? contentId}. Status: ${asset.status}. Transcoding runs in the background.`
-      );
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      loadStats();
-    } catch (err) {
-      setUploadError(errorMessage(err, 'Upload failed'));
-    } finally {
-      setUploading(false);
-    }
-  };
+  const markAssetBusy = (id: string, busy: boolean) =>
+    setBusyAssetIds((ids) => (busy ? [...ids, id] : ids.filter((x) => x !== id)));
 
-  const handleRetry = async (asset: MediaAsset) => {
-    setRetryingIds((ids) => [...ids, asset.id]);
+  const clearMessages = () => {
     setActionError(null);
     setActionSuccess(null);
+  };
+
+  const assetName = (asset: MediaAsset) => titleById.get(asset.contentId) ?? asset.originalFilename ?? shortId(asset.contentId);
+
+  const handleRetry = async (asset: MediaAsset) => {
+    markAssetBusy(asset.id, true);
+    clearMessages();
     try {
       const updated = await adminService.retryTranscode(asset.id);
       setAssets((list) => list.map((a) => (a.id === asset.id ? updated : a)));
@@ -274,19 +277,75 @@ export const MediaPipelinePage: React.FC = () => {
         targetId: asset.id,
         details: asset.originalFilename ?? asset.contentId,
       });
-      setActionSuccess(`Transcode re-queued for ${asset.originalFilename ?? shortId(asset.id)} (status: ${updated.status}).`);
+      setActionSuccess(`Transcode re-queued for ${assetName(asset)} (status: ${updated.status}).`);
       loadStats();
     } catch (err) {
       setActionError(errorMessage(err, 'Failed to retry transcode'));
     } finally {
-      setRetryingIds((ids) => ids.filter((x) => x !== asset.id));
+      markAssetBusy(asset.id, false);
     }
   };
 
-  const handleCopy = async (asset: MediaAsset, url: string) => {
+  const handleDeleteAsset = async (asset: MediaAsset) => {
+    const name = assetName(asset);
+    if (!window.confirm(`Delete the video of ${name}? Its source file and HLS renditions are removed and viewers can no longer play it.`)) {
+      return;
+    }
+    markAssetBusy(asset.id, true);
+    clearMessages();
+    try {
+      await adminService.deleteMediaAsset(asset.id);
+      setAssets((list) => list.filter((a) => a.id !== asset.id));
+      audit({ action: 'MEDIA_ASSET_DELETED', targetType: 'MEDIA', targetId: asset.id, details: `${name} · ${asset.originalFilename ?? ''}` });
+      setActionSuccess(`Video of ${name} deleted.`);
+      loadStats();
+    } catch (err) {
+      setActionError(errorMessage(err, 'Failed to delete the video'));
+    } finally {
+      markAssetBusy(asset.id, false);
+    }
+  };
+
+  const handlePreview = async (asset: MediaAsset) => {
+    markAssetBusy(asset.id, true);
+    clearMessages();
+    try {
+      const { streamUrl } = await adminService.getAssetPreview(asset.contentId);
+      setPreview({ title: assetName(asset), url: resolveApiUrl(streamUrl) });
+    } catch (err) {
+      setActionError(errorMessage(err, 'Failed to open the preview'));
+    } finally {
+      markAssetBusy(asset.id, false);
+    }
+  };
+
+  const handleDeleteFile = async (file: MediaFile) => {
+    if (
+      !window.confirm(
+        `Delete "${file.filename}"? Any poster, backdrop, thumbnail or trailer that still links to it will stop loading in the apps.`
+      )
+    ) {
+      return;
+    }
+    setDeletingFileIds((ids) => [...ids, file.id]);
+    clearMessages();
+    try {
+      await adminService.deleteMediaFile(file.id);
+      audit({ action: 'MEDIA_FILE_DELETED', targetType: 'MEDIA_FILE', targetId: file.id, details: `${file.purpose} · ${file.filename}` });
+      setActionSuccess(`"${file.filename}" deleted.`);
+      if (files && files.content.length === 1 && filePage > 0) setFilePage((p) => p - 1);
+      else loadFiles();
+    } catch (err) {
+      setActionError(errorMessage(err, 'Failed to delete the file'));
+    } finally {
+      setDeletingFileIds((ids) => ids.filter((x) => x !== file.id));
+    }
+  };
+
+  const handleCopy = async (id: string, url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      setCopiedId(asset.id);
+      setCopiedId(id);
     } catch (err) {
       setActionError(errorMessage(err, 'Could not copy to clipboard'));
     }
@@ -315,7 +374,7 @@ export const MediaPipelinePage: React.FC = () => {
         <StatCard
           title="In Progress"
           value={formatNumber(count('UPLOADING') + count('PROCESSING'))}
-          subtitle={stats ? `${formatNumber(count('UPLOADING'))} uploading · ${formatNumber(count('PROCESSING'))} transcoding` : undefined}
+          subtitle={stats ? `${formatNumber(count('UPLOADING'))} downloading · ${formatNumber(count('PROCESSING'))} transcoding` : undefined}
           icon={Loader2}
           iconBgColor="bg-amber-500/10 text-amber-400"
           unavailable={!stats}
@@ -329,98 +388,55 @@ export const MediaPipelinePage: React.FC = () => {
         />
       </div>
 
-      <form onSubmit={handleUpload} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+      <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
         <div>
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <UploadCloud className="w-4 h-4 text-red-500" />
-            Upload Source Video
+            Movie Video
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            The file is uploaded to the media service, then transcoded to HLS with ffmpeg in the background. Server limit: 500 MB.
-          </p>
-          <UploadLimitsNote />
-          <p className="text-[11px] text-slate-500 mt-1">
-            TV episode videos are uploaded per episode from Catalog → TV Shows → Manage episodes.
+            Upload a source video of any size (sent in 32 MB chunks to object storage) or import it from a direct link; it is then
+            transcoded to HLS in the background. Episode videos are managed from Catalog → TV Shows → Manage episodes.
           </p>
         </div>
-
-        <fieldset disabled={uploading} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Catalog Title</label>
-            {titlesError ? (
-              <ErrorBanner message={titlesError} onRetry={loadTitles} />
-            ) : (
-              <select
-                required
-                value={contentId}
-                onChange={(e) => setContentId(e.target.value)}
-                disabled={titlesLoading}
-                className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-red-500 disabled:opacity-50"
-              >
-                <option value="">
-                  {titlesLoading
-                    ? 'Loading titles…'
-                    : movies.length + shows.length === 0
-                      ? 'No titles in catalog — create one first'
-                      : 'Select a movie or show'}
+        <div className="max-w-md">
+          <label className="block text-xs font-semibold text-slate-300 mb-1">Movie</label>
+          {titlesError ? (
+            <ErrorBanner message={titlesError} onRetry={loadTitles} />
+          ) : (
+            <select
+              value={movieId}
+              onChange={(e) => setMovieId(e.target.value)}
+              disabled={titlesLoading}
+              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-red-500 disabled:opacity-50"
+            >
+              <option value="">
+                {titlesLoading ? 'Loading movies…' : movies.length === 0 ? 'No movies in the catalog — create one first' : 'Select a movie'}
+              </option>
+              {movies.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title} ({m.status})
                 </option>
-                {movies.length > 0 && (
-                  <optgroup label="Movies">
-                    {movies.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        Movie: {m.title} ({m.status})
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {shows.length > 0 && (
-                  <optgroup label="TV Shows">
-                    {shows.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        Show: {s.title} ({s.status})
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Video File</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              required
-              onChange={handleFileChange}
-              className="w-full text-xs text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:text-xs file:font-semibold hover:file:bg-slate-700 disabled:opacity-50"
-            />
-            {file && <p className="text-[11px] text-slate-500 mt-1">{file.name} · {formatBytes(file.size)}</p>}
-          </div>
-        </fieldset>
-
-        {uploading && <UploadProgressBar progress={progress} />}
-
-        <ErrorBanner message={uploadError} />
-        <SuccessBanner message={uploadSuccess} />
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={uploading || !contentId || !file}
-            className="flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
-          >
-            <UploadCloud className="w-4 h-4" />
-            {uploading ? 'Uploading…' : 'Upload & Transcode'}
-          </button>
+              ))}
+            </select>
+          )}
         </div>
-      </form>
+        {selectedMovie && (
+          <VideoSourceInput
+            key={selectedMovie.id}
+            contentId={selectedMovie.id}
+            contentLabel={`Movie "${selectedMovie.title}"`}
+            auditTargetType="MOVIE"
+            onAssetChange={() => loadAssets(true)}
+          />
+        )}
+      </section>
 
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-white">Media Assets</h3>
+          <h3 className="text-sm font-bold text-white">Video Assets</h3>
           <p className="text-[11px] text-slate-500">
-            {hasActiveAssets ? 'Auto-refreshing every 10s while assets are uploading or transcoding.' : 'Newest first.'}
+            {hasActiveAssets ? 'Auto-refreshing every 5s while videos are downloading or transcoding.' : 'Newest first.'}
           </p>
         </div>
         <button
@@ -445,82 +461,85 @@ export const MediaPipelinePage: React.FC = () => {
           error ? (
             <EmptyState title="Media assets unavailable" hint="The asset list could not be loaded. See the error above." />
           ) : (
-            <EmptyState title="No media assets yet" hint="Upload a source video for a catalog title above to start the HLS pipeline." />
+            <EmptyState title="No videos yet" hint="Upload or import a video for a movie above, or for an episode from the catalog." />
           )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-950 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
                 <tr>
-                  <th className="px-6 py-4">Source File & Title</th>
+                  <th className="px-6 py-4">Source & Title</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">HLS Master Playlist</th>
                   <th className="px-6 py-4">Duration</th>
                   <th className="px-6 py-4">Size</th>
                   <th className="px-6 py-4">Created / Updated</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
                 {assets.map((asset) => {
-                  const retrying = retryingIds.includes(asset.id);
-                  const url = asset.masterPlaylistUrl ? playlistHref(asset.masterPlaylistUrl) : null;
+                  const busy = busyAssetIds.includes(asset.id);
+                  const label = assetStatusLabel(asset);
                   return (
                     <tr key={asset.id} className="hover:bg-slate-800/40 transition align-top">
                       <td className="px-6 py-4">
                         <div className="flex items-start gap-2">
                           <FileVideo className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <span className="font-semibold text-white block break-all">{asset.originalFilename ?? '—'}</span>
+                          <div className="min-w-0 max-w-sm">
+                            <span className="font-semibold text-white block break-all">
+                              {asset.originalFilename ?? (asset.sourceUrl ? 'Imported video' : '—')}
+                            </span>
                             <span className="text-[11px] text-slate-400 block">
                               {titleById.get(asset.contentId) ?? (titlesLoading ? 'Loading title…' : 'Unknown title')}
                             </span>
+                            {asset.sourceUrl && (
+                              <span className="text-[10px] text-slate-500 block break-all">From {asset.sourceUrl}</span>
+                            )}
                             <span className="text-[10px] text-slate-500 font-mono">{asset.contentId}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 space-y-2">
-                        <StatusBadge status={asset.status} />
-                        {asset.status === 'FAILED' && (
-                          <div className="space-y-2 max-w-xs">
-                            {asset.failureReason && (
-                              <p className="text-[11px] text-rose-300 break-words">{asset.failureReason}</p>
-                            )}
-                            <button
-                              onClick={() => handleRetry(asset)}
-                              disabled={retrying}
-                              className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] font-semibold transition disabled:opacity-50"
-                            >
-                              <RotateCcw className={`w-3 h-3 ${retrying ? 'animate-spin' : ''}`} />
-                              {retrying ? 'Retrying…' : 'Retry transcode'}
-                            </button>
-                          </div>
-                        )}
-                      </td>
                       <td className="px-6 py-4">
-                        {url ? (
-                          <div className="flex items-start gap-2 max-w-sm">
-                            <span className="font-mono text-[11px] text-slate-400 break-all">{url}</span>
-                            <button
-                              onClick={() => handleCopy(asset, url)}
-                              title="Copy URL"
-                              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
-                            >
-                              {copiedId === asset.id ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-600">Not available yet</span>
-                        )}
+                        <div className="space-y-1.5 min-w-[150px] max-w-xs">
+                          <StatusBadge status={asset.status} />
+                          {label && <p className="text-[11px] text-amber-300">{label}</p>}
+                          {asset.status === 'PROCESSING' && asset.progressPercent != null && (
+                            <ProgressBar percent={asset.progressPercent} compact tone="amber" />
+                          )}
+                          {asset.status === 'FAILED' && asset.failureReason && (
+                            <p className="text-[11px] text-rose-300 break-words line-clamp-4" title={asset.failureReason}>
+                              {asset.failureReason}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-slate-400">{formatDuration(asset.durationSeconds)}</td>
                       <td className="px-6 py-4 text-slate-400">{formatBytes(asset.fileSizeBytes)}</td>
                       <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
                         <span className="block">{formatDateTime(asset.createdAt)}</span>
                         <span className="block text-[10px] text-slate-500">{formatDateTime(asset.updatedAt)}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-2">
+                          {asset.status === 'COMPLETED' && (
+                            <button onClick={() => handlePreview(asset)} disabled={busy} className={BUTTON_SECONDARY}>
+                              <Eye className="w-3 h-3" />
+                              Preview
+                            </button>
+                          )}
+                          {asset.status === 'FAILED' && (
+                            <button onClick={() => handleRetry(asset)} disabled={busy} className={BUTTON_SECONDARY}>
+                              <RotateCcw className={`w-3 h-3 ${busy ? 'animate-spin' : ''}`} />
+                              Retry
+                            </button>
+                          )}
+                          {asset.status !== 'PROCESSING' && (
+                            <button onClick={() => handleDeleteAsset(asset)} disabled={busy} className={BUTTON_DANGER}>
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -530,6 +549,167 @@ export const MediaPipelinePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-white">Images & Trailers</h3>
+          <p className="text-[11px] text-slate-500">Files uploaded for posters, backdrops, thumbnails and trailers (publicly served).</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {(
+            [
+              ['', 'All'],
+              ['IMAGE', 'Images'],
+              ['TRAILER', 'Trailers'],
+            ] as const
+          ).map(([value, text]) => (
+            <button
+              key={text}
+              onClick={() => {
+                setFilePurpose(value);
+                setFilePage(0);
+              }}
+              className={TAB_CLASS(filePurpose === value)}
+            >
+              {text}
+            </button>
+          ))}
+          <button
+            onClick={loadFiles}
+            disabled={filesLoading}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${filesLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <ErrorBanner message={filesError} onRetry={loadFiles} />
+
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        {filesLoading && !files ? (
+          <LoadingState label="Loading files…" />
+        ) : !files || files.content.length === 0 ? (
+          filesError ? (
+            <EmptyState title="Files unavailable" hint="The file list could not be loaded. See the error above." />
+          ) : (
+            <EmptyState title="No files uploaded yet" hint="Upload artwork or trailers from the movie and TV show forms." />
+          )
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4">Preview</th>
+                    <th className="px-6 py-4">File</th>
+                    <th className="px-6 py-4">Size</th>
+                    <th className="px-6 py-4">Uploaded</th>
+                    <th className="px-6 py-4">Public URL</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  {files.content.map((file) => {
+                    const deleting = deletingFileIds.includes(file.id);
+                    return (
+                      <tr key={file.id} className="hover:bg-slate-800/40 transition align-top">
+                        <td className="px-6 py-3">
+                          {file.purpose === 'IMAGE' ? (
+                            <img
+                              src={file.url}
+                              alt=""
+                              loading="lazy"
+                              className="w-20 h-12 rounded object-cover bg-slate-800 border border-slate-700"
+                            />
+                          ) : (
+                            <video
+                              src={file.url}
+                              preload="metadata"
+                              controls
+                              className="w-32 aspect-video rounded bg-black border border-slate-700"
+                            />
+                          )}
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-start gap-2">
+                            {file.purpose === 'IMAGE' ? (
+                              <ImageIcon className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <Film className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="font-semibold text-white block break-all">{file.filename}</span>
+                              <span className="text-[10px] text-slate-500">
+                                {file.purpose} · {file.contentType}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 text-slate-400">{formatBytes(file.sizeBytes)}</td>
+                        <td className="px-6 py-3 text-slate-400 whitespace-nowrap">{formatDateTime(file.createdAt)}</td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-start gap-2 max-w-sm">
+                            <span className="font-mono text-[11px] text-slate-400 break-all">{file.url}</span>
+                            <button
+                              onClick={() => handleCopy(file.id, file.url)}
+                              title="Copy URL"
+                              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
+                            >
+                              {copiedId === file.id ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex justify-end">
+                            <button onClick={() => handleDeleteFile(file)} disabled={deleting} className={BUTTON_DANGER}>
+                              <Trash2 className="w-3 h-3" />
+                              {deleting ? 'Deleting…' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-800 text-[11px] text-slate-400">
+              <span>
+                {formatNumber(files.totalElements)} file{files.totalElements === 1 ? '' : 's'} · page {files.number + 1} of{' '}
+                {Math.max(1, files.totalPages)}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFilePage((p) => Math.max(0, p - 1))}
+                  disabled={filesLoading || files.number <= 0}
+                  className={BUTTON_SECONDARY}
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                  Previous
+                </button>
+                <button
+                  onClick={() => setFilePage((p) => p + 1)}
+                  disabled={filesLoading || files.number + 1 >= files.totalPages}
+                  className={BUTTON_SECONDARY}
+                >
+                  Next
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <Modal isOpen={preview !== null} onClose={() => setPreview(null)} title={preview ? `Preview · ${preview.title}` : 'Preview'}>
+        {preview && <HlsPlayer src={preview.url} />}
+      </Modal>
     </div>
   );
 };

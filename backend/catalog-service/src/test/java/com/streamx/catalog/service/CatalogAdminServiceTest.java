@@ -27,6 +27,8 @@ class CatalogAdminServiceTest {
     @Autowired
     private CatalogAdminService adminService;
     @Autowired
+    private CatalogService catalogService;
+    @Autowired
     private SeasonRepository seasonRepository;
     @Autowired
     private EpisodeRepository episodeRepository;
@@ -141,6 +143,53 @@ class CatalogAdminServiceTest {
         assertFalse(episodeRepository.existsById(UUID.fromString(e1.id())));
         assertFalse(episodeRepository.existsById(UUID.fromString(e2.id())));
         assertThrows(ResourceNotFoundException.class, () -> adminService.deleteSeason(season.id()));
+    }
+
+    @Test
+    void updateMovie_replacesFieldsAndClearsOmittedOnes() {
+        CreateMovieRequest create = new CreateMovieRequest();
+        create.setTitle("Original");
+        create.setPosterUrl("https://cdn.example/poster.jpg");
+        create.setTrailerUrl("https://cdn.example/trailer.mp4");
+        String movieId = catalogService.createMovie(create).getId();
+
+        CreateMovieRequest update = new CreateMovieRequest();
+        update.setTitle("  Renamed  ");
+        update.setBackdropUrl("https://cdn.example/backdrop.jpg");
+        update.setRuntimeMinutes(101);
+        update.setStatus(ContentStatus.PUBLISHED);
+        MovieResponse updated = adminService.updateMovie(movieId, update);
+
+        assertEquals("Renamed", updated.getTitle());
+        assertNull(updated.getPosterUrl());
+        assertNull(updated.getTrailerUrl());
+        assertEquals("https://cdn.example/backdrop.jpg", updated.getBackdropUrl());
+        assertEquals(ContentStatus.PUBLISHED, updated.getStatus());
+        assertEquals(101, adminService.getMovie(movieId).getRuntimeMinutes());
+
+        update.setRuntimeMinutes(0);
+        assertThrows(BadRequestException.class, () -> adminService.updateMovie(movieId, update));
+
+        adminService.deleteMovie(movieId);
+        assertThrows(ResourceNotFoundException.class, () -> adminService.getMovie(movieId));
+    }
+
+    @Test
+    void updateTvShow_keepsSeasonsAndDeleteCascades() {
+        SeasonResponse season = adminService.createSeason(showId, seasonRequest(1, null));
+        EpisodeResponse episode = adminService.createEpisode(season.id(), episodeRequest(1, "Pilot", null));
+
+        TvShowResponse updated = adminService.updateTvShow(showId, new CreateTvShowRequest("Renamed Show", "New synopsis",
+                null, "TV-MA", "https://cdn.example/p.jpg", null, null, null, null, 9));
+        assertEquals("Renamed Show", updated.title());
+        assertEquals("https://cdn.example/p.jpg", updated.posterUrl());
+        assertEquals(ContentStatus.DRAFT, updated.status());
+        assertEquals(1, updated.seasonsCount());
+
+        adminService.deleteTvShow(showId);
+        assertThrows(ResourceNotFoundException.class, () -> adminService.getTvShowDetail(showId));
+        assertFalse(seasonRepository.existsById(UUID.fromString(season.id())));
+        assertFalse(episodeRepository.existsById(UUID.fromString(episode.id())));
     }
 
     private TvShowResponse findListed() {

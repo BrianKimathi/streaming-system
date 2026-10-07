@@ -14,6 +14,21 @@
     <artifactId>media-service</artifactId>
     <name>StreamX Media Service</name>
 
+    <properties>
+        <minio.version>8.5.17</minio.version>
+        <okhttp.version>4.12.0</okhttp.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>com.streamx</groupId>
@@ -30,6 +45,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>

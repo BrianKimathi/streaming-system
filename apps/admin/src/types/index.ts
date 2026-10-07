@@ -123,6 +123,22 @@ export interface CreateMovieRequest {
   genreIds?: string[];
 }
 
+/**
+ * Body for PUT /catalog/admin/movies/{id}: replaces the movie's details, so cleared optional fields are sent as null.
+ */
+export interface UpdateMovieRequest {
+  title: string;
+  synopsis: string | null;
+  releaseDate: string | null;
+  runtimeMinutes: number | null;
+  maturityRating: string | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  trailerUrl: string | null;
+  status: ContentStatus;
+  genreIds: string[];
+}
+
 export interface TVShow {
   id: string;
   title: string;
@@ -149,6 +165,19 @@ export interface CreateTvShowRequest {
   status?: ContentStatus;
   genreIds?: string[];
   seasonsCount?: number;
+}
+
+/** Body for PUT /catalog/admin/tv-shows/{id}: replaces the show's details (seasons are managed separately). */
+export interface UpdateTvShowRequest {
+  title: string;
+  synopsis: string | null;
+  releaseDate: string | null;
+  maturityRating: string | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  trailerUrl: string | null;
+  status: ContentStatus;
+  genreIds: string[];
 }
 
 export interface Episode {
@@ -358,6 +387,10 @@ export interface MediaAsset {
   failureReason: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Link the video was imported from, if it was imported rather than uploaded. */
+  sourceUrl?: string | null;
+  /** 0–100 while PROCESSING (transcoding); null otherwise. */
+  progressPercent?: number | null;
 }
 
 export interface MediaStats {
@@ -365,6 +398,106 @@ export interface MediaStats {
   countByStatus: Record<string, number>;
   totalReadyDurationSeconds: number;
   totalSourceBytes: number;
+}
+
+export type UploadPurpose = 'VIDEO' | 'TRAILER' | 'IMAGE';
+
+export interface CreateUploadRequest {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  purpose: UploadPurpose;
+  /** Required for VIDEO: the movie or episode id. */
+  contentId?: string;
+}
+
+export interface UploadSession {
+  uploadId: string;
+  purpose: UploadPurpose;
+  contentId: string | null;
+  filename: string;
+  sizeBytes: number;
+  chunkSizeBytes: number;
+  totalParts: number;
+  receivedParts: number[];
+  status: 'OPEN' | 'COMPLETED' | 'ABORTED';
+  createdAt: string;
+}
+
+export interface UploadPartResponse {
+  partNumber: number;
+  sizeBytes: number;
+  receivedParts: number[];
+}
+
+/** A public image or trailer stored by the media service. */
+export interface MediaFile {
+  id: string;
+  purpose: UploadPurpose;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  createdAt: string;
+}
+
+export interface UploadCompleteResponse {
+  purpose: UploadPurpose;
+  file: MediaFile | null;
+  asset: MediaAsset | null;
+}
+
+export interface MediaPreview {
+  streamUrl: string;
+}
+
+// --- Payments settings (M-Pesa Daraja) ---
+export type MpesaEnvironment = 'sandbox' | 'production';
+export type MpesaTransactionType = 'CustomerPayBillOnline' | 'CustomerBuyGoodsOnline';
+export type SettingSource = 'DATABASE' | 'ENVIRONMENT' | 'NONE';
+
+export type MpesaSettingField =
+  | 'environment'
+  | 'shortcode'
+  | 'transactionType'
+  | 'callbackBaseUrl'
+  | 'consumerKey'
+  | 'consumerSecret'
+  | 'passkey'
+  | 'callbackToken';
+
+export interface MpesaSettings {
+  environment: MpesaEnvironment | null;
+  shortcode: string | null;
+  transactionType: MpesaTransactionType | null;
+  callbackBaseUrl: string | null;
+  consumerKeySet: boolean;
+  /** "••••" + last 4 characters of the stored consumer key, or null. */
+  consumerKeyHint: string | null;
+  consumerSecretSet: boolean;
+  passkeySet: boolean;
+  callbackTokenSet: boolean;
+  configured: boolean;
+  sources: Partial<Record<MpesaSettingField, SettingSource>>;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface MpesaSettingsUpdate {
+  environment: MpesaEnvironment;
+  shortcode: string;
+  transactionType: MpesaTransactionType;
+  callbackBaseUrl: string;
+  /** Null or blank keeps the stored value. */
+  consumerKey?: string | null;
+  consumerSecret?: string | null;
+  passkey?: string | null;
+  regenerateCallbackToken?: boolean;
+}
+
+export interface MpesaTestResult {
+  ok: boolean;
+  message: string;
 }
 
 // --- Trending ---

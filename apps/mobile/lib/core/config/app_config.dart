@@ -29,4 +29,40 @@ class AppConfig {
     final path = streamUrl.startsWith('/') ? streamUrl : '/$streamUrl';
     return '$apiOrigin$path';
   }
+
+  /// Normalises an artwork/trailer URL from the catalog: absolute `http(s)`
+  /// URLs (media-service files or external links) are kept, protocol-relative
+  /// `//host/...` becomes https, and relative paths (`/api/v1/media/files/...`)
+  /// are resolved against [origin] (defaults to [apiOrigin]). Returns null for
+  /// blank values and non-web schemes.
+  static String? resolveMediaUrl(String? url, {String? origin}) {
+    final raw = url?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    if (raw.startsWith('//')) return _webUrlOrNull('https:$raw');
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return null;
+    if (uri.hasScheme) return _webUrlOrNull(raw);
+    final base = origin ?? apiOrigin;
+    return raw.startsWith('/') ? '$base$raw' : '$base/$raw';
+  }
+
+  static String? _webUrlOrNull(String url) {
+    final uri = Uri.tryParse(url);
+    final web = uri != null && (uri.scheme == 'http' || uri.scheme == 'https') && uri.host.isNotEmpty;
+    return web ? url : null;
+  }
+
+  static const _videoExtensions = ['.mp4', '.m4v', '.mov', '.webm', '.m3u8'];
+
+  /// Whether [url] points straight at a playable video file (an uploaded
+  /// trailer or a direct MP4/HLS link) rather than a web page such as YouTube.
+  static bool isDirectVideoUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final path = uri.path.toLowerCase();
+    return path.contains('/api/v1/media/files/') || _videoExtensions.any(path.endsWith);
+  }
+
+  static bool isHlsUrl(String url) =>
+      (Uri.tryParse(url)?.path.toLowerCase() ?? '').endsWith('.m3u8');
 }

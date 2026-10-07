@@ -55,7 +55,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             Pattern.compile("^/api/v1/subscriptions/plans$"),
             Pattern.compile("^/api/v1/trending$"),
             // HLS playlists/segments; media-service validates the stream token embedded in the path.
-            Pattern.compile("^/api/v1/media/stream/[^/]+/[^/]+/[^/]+$")
+            Pattern.compile("^/api/v1/media/stream/[^/]+/[^/]+/[^/]+$"),
+            // Posters, backdrops, thumbnails and trailers.
+            Pattern.compile("^/api/v1/media/files/[^/]+/[^/]+$")
     );
 
     // Service-to-service endpoints are only reachable on the internal Docker network.
@@ -66,7 +68,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             Pattern.compile("^/api/v1/analytics(/.*)?$"),
             Pattern.compile("^/api/v1/[^/]+/admin(/.*)?$"),
             Pattern.compile("^/api/v1/notifications/send$"),
-            Pattern.compile("^/api/v1/media/upload(/.*)?$"),
             Pattern.compile("^/api/v1/billing/refund(/.*)?$")
     );
 
@@ -161,7 +162,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (HttpMethod.POST.equals(method)) {
             return PUBLIC_POST_ROUTES.stream().anyMatch(p -> p.matcher(path).matches());
         }
-        if (HttpMethod.GET.equals(method)) {
+        if (HttpMethod.GET.equals(method) || HttpMethod.HEAD.equals(method)) {
             return PUBLIC_GET_ROUTES.stream().anyMatch(p -> p.matcher(path).matches());
         }
         return false;

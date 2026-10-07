@@ -2,31 +2,44 @@ package com.streamx.media.hls;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.streamx.media.config.MediaProperties;
 import com.streamx.media.domain.MediaAsset;
 import com.streamx.media.domain.MediaProcessingStatus;
 import com.streamx.media.repository.MediaAssetRepository;
-import com.streamx.media.storage.StorageService;
+import com.streamx.media.service.AssetStatusUpdater;
+import com.streamx.media.storage.ObjectKeys;
+import com.streamx.media.storage.ObjectStat;
+import com.streamx.media.storage.ObjectStorage;
+import com.streamx.media.storage.ScratchSpace;
+import com.streamx.media.upload.Filenames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 @Service
 public class HlsTranscoderService {
 
     private static final Logger log = LoggerFactory.getLogger(HlsTranscoderService.class);
-    private static final int MAX_FAILURE_REASON_LENGTH = 1900;
+    private static final long PROGRESS_WRITE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(3);
 
     private record Rendition(int height, String videoBitrate, String maxRate, String bufSize, String audioBitrate) {
     }
@@ -40,94 +53,170 @@ public class HlsTranscoderService {
             new Rendition(1080, "5000k", "5350k", "10000k", "160k")
     );
 
-    private final StorageService storageService;
+    private final ObjectStorage storage;
+    private final ScratchSpace scratch;
     private final MediaAssetRepository repository;
+    private final AssetStatusUpdater statusUpdater;
     private final ObjectMapper objectMapper;
     private final String ffmpegPath;
     private final String ffprobePath;
     private final int threads;
     private final long timeoutMinutes;
 
-    public HlsTranscoderService(StorageService storageService,
+    public HlsTranscoderService(ObjectStorage storage,
+                                ScratchSpace scratch,
                                 MediaAssetRepository repository,
+                                AssetStatusUpdater statusUpdater,
                                 ObjectMapper objectMapper,
-                                @Value("${media.ffmpeg-path:ffmpeg}") String ffmpegPath,
-                                @Value("${media.ffprobe-path:ffprobe}") String ffprobePath,
-                                @Value("${media.transcode-threads:2}") int threads,
-                                @Value("${media.transcode-timeout-minutes:240}") long timeoutMinutes) {
-        this.storageService = storageService;
+                                MediaProperties properties) {
+        this.storage = storage;
+        this.scratch = scratch;
         this.repository = repository;
+        this.statusUpdater = statusUpdater;
         this.objectMapper = objectMapper;
-        this.ffmpegPath = ffmpegPath;
-        this.ffprobePath = ffprobePath;
-        this.threads = threads;
-        this.timeoutMinutes = timeoutMinutes;
+        this.ffmpegPath = properties.ffmpegPath();
+        this.ffprobePath = properties.ffprobePath();
+        this.threads = Math.max(1, properties.transcodeThreads());
+        this.timeoutMinutes = properties.transcodeTimeoutMinutes();
     }
 
-    public static String hlsDirectory(UUID contentId) {
-        return "hls/" + contentId;
-    }
-
-    public static String masterPlaylistUrl(UUID contentId) {
-        return "/api/v1/media/" + contentId + "/hls/master.m3u8";
+    /** Storage key of the master playlist; stream URLs are built per viewer with a stream token. */
+    public static String masterPlaylistKey(UUID contentId) {
+        return ObjectKeys.hls(contentId, "master.m3u8");
     }
 
     @Async("transcodeExecutor")
     public void transcode(UUID assetId) {
         MediaAsset asset = repository.findById(assetId).orElse(null);
-        if (asset == null) {
-            log.warn("Transcode requested for unknown media asset {}", assetId);
+        if (asset == null || asset.getStatus() != MediaProcessingStatus.PROCESSING || asset.getPendingUploadId() != null) {
+            log.debug("Skipping transcode of {}: not ready for processing", assetId);
             return;
         }
-
         UUID contentId = asset.getContentId();
-        String hlsDir = hlsDirectory(contentId);
-        Path logFile = storageService.resolve("raw/" + contentId + "/transcode.log");
-
+        Path workDir = null;
         try {
-            Path input = storageService.resolve(asset.getStoragePath());
-            if (!Files.isRegularFile(input)) {
-                throw new IllegalStateException("Source file is missing: " + asset.getStoragePath());
+            workDir = scratch.freshDirectory("transcode", assetId);
+            Path outputDir = Files.createDirectories(workDir.resolve("hls"));
+            Path logFile = workDir.resolve("ffmpeg.log");
+            String extension = Filenames.extension(asset.getStoragePath());
+            Path input = workDir.resolve(extension.isEmpty() ? "source" : "source." + extension);
+
+            if (asset.getStoragePath() == null || storage.stat(asset.getStoragePath()).isEmpty()) {
+                throw new IllegalStateException("Source file is missing; upload the video again");
             }
+            storage.downloadToFile(asset.getStoragePath(), input);
 
             ProbeResult probe = probe(input);
             log.info("Transcoding contentId {} ({}s, {}p, audio={})",
                     contentId, Math.round(probe.durationSeconds()), probe.height(), probe.hasAudio());
+            repository.updateProgress(assetId, 0);
 
-            storageService.deleteRecursively(hlsDir);
-            Path outputDir = storageService.resolve(hlsDir);
-            Files.createDirectories(outputDir);
-
-            List<String> command = buildFfmpegCommand(input, outputDir, probe);
-            Process process = new ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .redirectOutput(logFile.toFile())
-                    .start();
-
-            if (!process.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("ffmpeg timed out after " + timeoutMinutes + " minutes");
-            }
-            if (process.exitValue() != 0) {
-                throw new IllegalStateException("ffmpeg exited with code " + process.exitValue() + ": " + tail(logFile));
-            }
+            runFfmpeg(assetId, buildFfmpegCommand(input, outputDir, probe), logFile, probe.durationSeconds());
             if (!Files.isRegularFile(outputDir.resolve("master.m3u8"))) {
                 throw new IllegalStateException("ffmpeg finished without producing master.m3u8");
             }
+            publish(contentId, outputDir);
 
-            asset.setStatus(MediaProcessingStatus.COMPLETED);
-            asset.setDurationSeconds((int) Math.round(probe.durationSeconds()));
-            asset.setMasterPlaylistUrl(masterPlaylistUrl(contentId));
-            asset.setFailureReason(null);
-            repository.save(asset);
+            MediaAsset current = repository.findById(assetId).orElse(null);
+            if (current == null) {
+                return;
+            }
+            current.setStatus(MediaProcessingStatus.COMPLETED);
+            current.setDurationSeconds((int) Math.round(probe.durationSeconds()));
+            current.setMasterPlaylistUrl(masterPlaylistKey(contentId));
+            current.setFailureReason(null);
+            current.setProgressPercent(null);
+            repository.save(current);
             log.info("HLS transcoding completed for contentId {}", contentId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            markFailed(asset, "Transcoding interrupted");
+            statusUpdater.markFailed(assetId, "Transcoding interrupted");
         } catch (Exception e) {
             log.error("HLS transcoding failed for contentId {}", contentId, e);
-            markFailed(asset, e.getMessage());
+            statusUpdater.markFailed(assetId, e.getMessage());
+        } finally {
+            scratch.deleteQuietly(workDir);
         }
+    }
+
+    private void runFfmpeg(UUID assetId, List<String> command, Path logFile, double durationSeconds)
+            throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(command)
+                .redirectError(logFile.toFile())
+                .start();
+        Thread progressReader = Thread.ofPlatform().daemon().name("ffmpeg-progress-" + assetId).start(() -> {
+            int lastPercent = 0;
+            long lastWrite = System.nanoTime();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    OptionalLong micros = FfmpegProgress.outTimeMicros(line);
+                    if (micros.isEmpty()) {
+                        continue;
+                    }
+                    int percent = FfmpegProgress.percent(micros.getAsLong(), durationSeconds);
+                    long now = System.nanoTime();
+                    if (percent > lastPercent && now - lastWrite >= PROGRESS_WRITE_INTERVAL_NANOS) {
+                        repository.updateProgress(assetId, percent);
+                        lastPercent = percent;
+                        lastWrite = now;
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Stopped reading ffmpeg progress for {}: {}", assetId, e.toString());
+            }
+        });
+
+        if (!process.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
+            process.destroyForcibly();
+            progressReader.join(5_000);
+            throw new IllegalStateException("ffmpeg timed out after " + timeoutMinutes + " minutes");
+        }
+        progressReader.join(5_000);
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException("ffmpeg exited with code " + process.exitValue() + ": " + tail(logFile));
+        }
+    }
+
+    /*
+     * Segments first, then variant playlists, then the master, so a player never sees a playlist whose segments are
+     * not uploaded yet. Objects of the previous rendition that the new one does not overwrite are removed last.
+     */
+    private void publish(UUID contentId, Path outputDir) throws IOException {
+        String prefix = ObjectKeys.hlsPrefix(contentId);
+        Set<String> previous = new HashSet<>();
+        for (ObjectStat stat : storage.list(prefix)) {
+            previous.add(stat.key());
+        }
+
+        List<Path> files;
+        try (Stream<Path> stream = Files.list(outputDir)) {
+            files = stream.filter(Files::isRegularFile)
+                    .sorted(Comparator.comparingInt(HlsTranscoderService::publishOrder)
+                            .thenComparing(path -> path.getFileName().toString()))
+                    .toList();
+        }
+        Set<String> published = new HashSet<>();
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            String key = ObjectKeys.hls(contentId, name);
+            storage.uploadFile(key, file, name.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t");
+            published.add(key);
+        }
+        for (String key : previous) {
+            if (!published.contains(key)) {
+                storage.delete(key);
+            }
+        }
+    }
+
+    private static int publishOrder(Path file) {
+        String name = file.getFileName().toString();
+        if (name.equals("master.m3u8")) {
+            return 2;
+        }
+        return name.endsWith(".m3u8") ? 1 : 0;
     }
 
     ProbeResult probe(Path input) throws IOException, InterruptedException {
@@ -161,7 +250,7 @@ public class HlsTranscoderService {
         return new ProbeResult(duration, height, hasAudio);
     }
 
-    private List<String> buildFfmpegCommand(Path input, Path outputDir, ProbeResult probe) {
+    List<String> buildFfmpegCommand(Path input, Path outputDir, ProbeResult probe) {
         List<Rendition> renditions = new ArrayList<>();
         for (Rendition rendition : LADDER) {
             if (rendition.height() <= probe.height()) {
@@ -191,7 +280,9 @@ public class HlsTranscoderService {
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
             cmd.addAll(List.of("nice", "-n", "10"));
         }
-        cmd.addAll(List.of(ffmpegPath, "-hide_banner", "-nostdin", "-y", "-i", input.toString(),
+        cmd.addAll(List.of(ffmpegPath, "-hide_banner", "-nostdin", "-nostats", "-y",
+                "-progress", "pipe:1",
+                "-i", input.toString(),
                 "-filter_complex", filter.toString()));
 
         StringBuilder streamMap = new StringBuilder();
@@ -231,21 +322,14 @@ public class HlsTranscoderService {
         return cmd;
     }
 
-    private void markFailed(MediaAsset asset, String reason) {
-        String message = reason == null ? "Unknown transcoding error" : reason;
-        if (message.length() > MAX_FAILURE_REASON_LENGTH) {
-            message = message.substring(message.length() - MAX_FAILURE_REASON_LENGTH);
-        }
-        asset.setStatus(MediaProcessingStatus.FAILED);
-        asset.setFailureReason(message);
-        asset.setMasterPlaylistUrl(null);
-        repository.save(asset);
-    }
-
     private static String tail(Path logFile) {
-        try {
-            String content = Files.readString(logFile, StandardCharsets.UTF_8);
-            return content.length() > 1200 ? content.substring(content.length() - 1200) : content;
+        try (RandomAccessFile file = new RandomAccessFile(logFile.toFile(), "r")) {
+            long length = file.length();
+            int size = (int) Math.min(1200, length);
+            byte[] bytes = new byte[size];
+            file.seek(length - size);
+            file.readFully(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
         } catch (IOException e) {
             return "(no ffmpeg log)";
         }

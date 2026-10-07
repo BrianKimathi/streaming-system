@@ -15,6 +15,8 @@ public class MediaAssetResponse {
     private Long fileSizeBytes;
     private String failureReason;
     private LocalDateTime updatedAt;
+    private String sourceUrl;
+    private Integer progressPercent;
 
     public MediaAssetResponse() {
     }
@@ -108,5 +110,21 @@ public class MediaAssetResponse {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public Integer getProgressPercent() {
+        return progressPercent;
+    }
+
+    public void setProgressPercent(Integer progressPercent) {
+        this.progressPercent = progressPercent;
     }
 }

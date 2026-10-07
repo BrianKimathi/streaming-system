@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../core/config/app_config.dart';
 import '../core/theme/app_theme.dart';
 
 const _gradients = <List<Color>>[
@@ -40,10 +41,10 @@ class TitleArtwork extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fallback = GeneratedArtwork(title: title, backdrop: backdrop);
-    final url = imageUrl;
-    final Widget child = isHttpUrl(url)
+    final url = AppConfig.resolveMediaUrl(imageUrl);
+    final Widget child = url != null
         ? CachedNetworkImage(
-            imageUrl: url!.trim(),
+            imageUrl: url,
             fit: BoxFit.cover,
             fadeInDuration: const Duration(milliseconds: 200),
             placeholder: (_, _) => Container(color: AppColors.surface),

@@ -1,20 +1,11 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { MediaAsset } from '../../types';
+import type { UploadProgress } from '../../utils/chunkedUpload';
 import { formatBytes } from '../../utils/format';
 
-/** Mirrors the media service's multipart limit. */
-export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
-export const MEDIA_POLL_INTERVAL_MS = 10_000;
+export const MEDIA_POLL_INTERVAL_MS = 5_000;
 
 export const isAssetActive = (asset: MediaAsset) => asset.status === 'PROCESSING' || asset.status === 'UPLOADING';
-
-/** Returns a user-facing error if the file exceeds the server limit, otherwise null. */
-export function oversizeError(file: File): string | null {
-  return file.size > MAX_UPLOAD_BYTES
-    ? `"${file.name}" is ${formatBytes(file.size)}; the server limit is 500 MB.`
-    : null;
-}
 
 function assetTimestamp(asset: MediaAsset): number {
   const time = Date.parse(asset.updatedAt ?? asset.createdAt ?? '');
@@ -31,21 +22,47 @@ export function latestAssetByContent(assets: MediaAsset[]): Map<string, MediaAss
   return map;
 }
 
-export const UploadLimitsNote: React.FC = () => (
-  <p className="text-[11px] text-amber-400/90 mt-1 flex items-center gap-1.5">
-    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-    Uploads routed through Cloudflare are limited to ~100 MB on the free plan; larger files may be rejected with HTTP 413.
-  </p>
-);
+/** Short human label for an asset's state, e.g. "Transcoding 42%" or "Downloading from link". */
+export function assetStatusLabel(asset: MediaAsset): string | null {
+  if (asset.status === 'PROCESSING') {
+    return asset.progressPercent != null ? `Transcoding ${Math.round(asset.progressPercent)}%` : 'Transcoding…';
+  }
+  if (asset.status === 'UPLOADING') return asset.sourceUrl ? 'Downloading from link…' : 'Receiving upload…';
+  return null;
+}
 
-export const UploadProgressBar: React.FC<{ progress: number; compact?: boolean }> = ({ progress, compact }) => (
-  <div className="space-y-1">
-    <div className="flex justify-between gap-2 text-[11px] text-slate-400">
-      <span>{progress < 100 ? 'Uploading…' : compact ? 'Waiting for server…' : 'Upload sent, waiting for server response…'}</span>
-      <span>{progress}%</span>
-    </div>
-    <div className={`${compact ? 'h-1.5' : 'h-2'} bg-slate-800 rounded-full overflow-hidden`}>
-      <div className="h-full bg-red-600 transition-all" style={{ width: `${progress}%` }} />
-    </div>
+export const ProgressBar: React.FC<{ percent: number; compact?: boolean; tone?: 'red' | 'amber' }> = ({
+  percent,
+  compact,
+  tone = 'red',
+}) => (
+  <div className={`${compact ? 'h-1.5' : 'h-2'} bg-slate-800 rounded-full overflow-hidden`}>
+    <div
+      className={`h-full transition-all ${tone === 'amber' ? 'bg-amber-500' : 'bg-red-600'}`}
+      style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+    />
   </div>
 );
+
+export const UploadProgressBar: React.FC<{ progress: UploadProgress; compact?: boolean }> = ({ progress, compact }) => {
+  const label =
+    progress.phase === 'preparing'
+      ? 'Preparing upload…'
+      : progress.phase === 'finalizing'
+        ? 'Finishing upload on the server…'
+        : `Uploading ${formatBytes(progress.uploadedBytes)} of ${formatBytes(progress.totalBytes)}`;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between gap-2 text-[11px] text-slate-400">
+        <span className="truncate">{label}</span>
+        <span className="shrink-0">
+          {progress.percent}%
+          {!compact && progress.totalParts > 1 && progress.phase === 'uploading' && (
+            <span className="text-slate-500"> · part {Math.min(progress.partsDone + 1, progress.totalParts)}/{progress.totalParts}</span>
+          )}
+        </span>
+      </div>
+      <ProgressBar percent={progress.percent} compact={compact} />
+    </div>
+  );
+};

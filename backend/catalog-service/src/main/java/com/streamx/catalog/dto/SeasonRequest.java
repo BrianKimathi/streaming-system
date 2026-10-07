@@ -12,6 +12,6 @@ public record SeasonRequest(
         @Size(max = 255, message = "Title is too long") String title,
         @Size(max = 2000, message = "Synopsis is too long") String synopsis,
         LocalDate releaseDate,
-        @Size(max = 255, message = "Poster URL is too long") String posterUrl
+        @MediaUrl String posterUrl
 ) {
 }

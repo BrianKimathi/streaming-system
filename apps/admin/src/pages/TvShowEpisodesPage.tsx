@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Clapperboard, Pencil, Plus, RefreshCw, RotateCcw, Trash2, Tv, UploadCloud } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ChevronDown, ChevronUp, Clapperboard, Film, Image as ImageIcon, Pencil, Plus, RefreshCw, Trash2, Tv } from 'lucide-react';
 import { adminService, audit } from '../services/adminService';
 import { errorMessage } from '../api/client';
 import type { Episode, EpisodeRequest, MediaAsset, Season, SeasonRequest, TVShow, TvShowDetail } from '../types';
@@ -7,13 +7,18 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { EmptyState, ErrorBanner, LoadingState, SuccessBanner } from '../components/common/Feedback';
 import {
   MEDIA_POLL_INTERVAL_MS,
-  UploadLimitsNote,
+  ProgressBar,
   UploadProgressBar,
+  assetStatusLabel,
   isAssetActive,
   latestAssetByContent,
-  oversizeError,
 } from '../components/common/VideoUpload';
+import { AssetInput } from '../components/media/AssetInput';
+import { VideoSourceInput } from '../components/media/VideoSourceInput';
+import type { UploadProgress } from '../utils/chunkedUpload';
+import { useBusyKeys, useUnloadGuard } from '../hooks/useUnloadGuard';
 import { formatDate, formatDuration } from '../utils/format';
+import { linkError } from '../utils/media';
 import { INPUT_CLASS, LABEL_CLASS, optionalText } from './CreateMoviePage';
 
 interface TvShowEpisodesPageProps {
@@ -92,14 +97,13 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
   const [submitting, setSubmitting] = useState(false);
 
   const [busyIds, setBusyIds] = useState<string[]>([]);
-  const [retryingIds, setRetryingIds] = useState<string[]>([]);
-  const [uploads, setUploads] = useState<Record<string, number>>({});
-  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [uploads, setUploads] = useState<Record<string, UploadProgress>>({});
+  // Video panels stay mounted once opened (hidden when collapsed) so collapsing never cancels an upload.
+  const [mountedVideoIds, setMountedVideoIds] = useState<string[]>([]);
+  const [openVideoIds, setOpenVideoIds] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadTargetRef = useRef<{ episode: Episode; seasonNumber: number } | null>(null);
+  const { busy: formUploading, setBusy: setFormBusy } = useBusyKeys();
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -150,7 +154,26 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
   }, [hasActiveEpisodeAssets, loadAssets]);
 
   const readyCount = allEpisodes.filter((e) => latestAssets.get(e.id)?.status === 'COMPLETED').length;
-  const uploadsInFlight = Object.keys(uploads).length > 0;
+  const videoUploadsInFlight = Object.keys(uploads).length > 0;
+  const uploadsInFlight = videoUploadsInFlight || formUploading;
+  useUnloadGuard(uploadsInFlight);
+
+  const setEpisodeAsset = useCallback((episodeId: string, asset: MediaAsset | null) => {
+    setAssets((list) => {
+      const others = list.filter((a) => a.contentId !== episodeId);
+      return asset ? [asset, ...others] : others;
+    });
+    setAssetsLoaded(true);
+  }, []);
+
+  const setEpisodeUpload = useCallback((episodeId: string, progress: UploadProgress | null) => {
+    setUploads((m) => (progress ? { ...m, [episodeId]: progress } : withoutKey(m, episodeId)));
+  }, []);
+
+  const toggleVideoPanel = (episodeId: string) => {
+    setMountedVideoIds((ids) => (ids.includes(episodeId) ? ids : [...ids, episodeId]));
+    setOpenVideoIds((ids) => (ids.includes(episodeId) ? ids.filter((x) => x !== episodeId) : [...ids, episodeId]));
+  };
 
   const markBusy = (id: string, busy: boolean) =>
     setBusyIds((ids) => (busy ? [...ids, id] : ids.filter((x) => x !== id)));
@@ -211,6 +234,11 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
     const seasonNumber = parseWholeNumber(seasonForm.seasonNumber, 'Season number', 0, 1000);
     if (typeof seasonNumber === 'string') {
       setFormError(seasonNumber);
+      return;
+    }
+    const posterProblem = formUploading ? 'Wait for the poster upload to finish.' : linkError('Poster', seasonForm.posterUrl);
+    if (posterProblem) {
+      setFormError(posterProblem);
       return;
     }
     const isCreate = editor.seasonId === null;
@@ -315,6 +343,11 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
       }
       runtimeMinutes = parsed;
     }
+    const thumbnailProblem = formUploading ? 'Wait for the thumbnail upload to finish.' : linkError('Thumbnail', episodeForm.thumbnailUrl);
+    if (thumbnailProblem) {
+      setFormError(thumbnailProblem);
+      return;
+    }
     const isCreate = editor.episodeId === null;
     const empty = isCreate ? undefined : null;
     const body: EpisodeRequest = {
@@ -394,72 +427,6 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
     }
   };
 
-  // --- Videos ---
-
-  const pickVideo = (season: Season, episode: Episode) => {
-    uploadTargetRef.current = { episode, seasonNumber: season.seasonNumber };
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    const target = uploadTargetRef.current;
-    uploadTargetRef.current = null;
-    if (!file || !target) return;
-    const { episode, seasonNumber } = target;
-    const code = episodeCode(seasonNumber, episode.episodeNumber);
-    clearMessages();
-
-    const tooLarge = oversizeError(file);
-    if (tooLarge) {
-      setUploadErrors((m) => ({ ...m, [episode.id]: tooLarge }));
-      return;
-    }
-    setUploadErrors((m) => withoutKey(m, episode.id));
-    setUploads((m) => ({ ...m, [episode.id]: 0 }));
-    try {
-      const asset = await adminService.uploadMedia(episode.id, file, (percent) =>
-        setUploads((m) => (episode.id in m ? { ...m, [episode.id]: percent } : m))
-      );
-      setAssets((list) => [asset, ...list.filter((a) => a.id !== asset.id)]);
-      setAssetsLoaded(true);
-      audit({
-        action: 'EPISODE_VIDEO_UPLOADED',
-        targetType: 'EPISODE',
-        targetId: episode.id,
-        details: `${show.title} · ${code} · ${file.name}`,
-      });
-      setSuccess(`Uploaded "${file.name}" for ${code}. Status: ${asset.status}. Transcoding runs in the background.`);
-    } catch (err) {
-      setUploadErrors((m) => ({ ...m, [episode.id]: errorMessage(err, 'Upload failed') }));
-    } finally {
-      setUploads((m) => withoutKey(m, episode.id));
-    }
-  };
-
-  const retryTranscode = async (asset: MediaAsset, code: string) => {
-    setRetryingIds((ids) => [...ids, asset.id]);
-    clearMessages();
-    try {
-      const updated = await adminService.retryTranscode(asset.id);
-      setAssets((list) => list.map((a) => (a.id === asset.id ? updated : a)));
-      audit({
-        action: 'MEDIA_TRANSCODE_RETRIED',
-        targetType: 'MEDIA',
-        targetId: asset.id,
-        details: `${show.title} · ${code} · ${asset.originalFilename ?? asset.contentId}`,
-      });
-      setSuccess(`Transcode re-queued for ${code} (status: ${updated.status}).`);
-    } catch (err) {
-      setActionError(errorMessage(err, 'Failed to retry transcode'));
-    } finally {
-      setRetryingIds((ids) => ids.filter((x) => x !== asset.id));
-    }
-  };
-
   const refresh = () => {
     clearMessages();
     loadDetail();
@@ -517,32 +484,38 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
               className={INPUT_CLASS}
             />
           </div>
-          <div>
-            <label className={LABEL_CLASS}>Poster URL</label>
-            <input
-              type="url"
-              value={seasonForm.posterUrl}
-              onChange={(e) => setSeasonForm({ ...seasonForm, posterUrl: e.target.value })}
-              className={INPUT_CLASS}
-            />
-          </div>
         </fieldset>
+        <AssetInput
+          label="Season poster"
+          kind="image"
+          preview="poster"
+          value={seasonForm.posterUrl}
+          disabled={submitting}
+          onChange={(posterUrl) => setSeasonForm((f) => (f ? { ...f, posterUrl } : f))}
+          onBusyChange={(busy) => setFormBusy('season-poster', busy)}
+        />
         <ErrorBanner message={formError} />
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={closeEditor}
-            disabled={submitting}
+            disabled={submitting || formUploading}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || formUploading}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : editor?.kind === 'season' && editor.seasonId ? 'Save season' : 'Create season'}
+            {submitting
+              ? 'Saving…'
+              : formUploading
+                ? 'Waiting for upload…'
+                : editor?.kind === 'season' && editor.seasonId
+                  ? 'Save season'
+                  : 'Create season'}
           </button>
         </div>
       </form>
@@ -589,7 +562,7 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
               className={INPUT_CLASS}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={LABEL_CLASS}>Runtime (minutes)</label>
               <input
@@ -610,42 +583,47 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
                 className={INPUT_CLASS}
               />
             </div>
-            <div>
-              <label className={LABEL_CLASS}>Thumbnail URL</label>
-              <input
-                type="url"
-                value={episodeForm.thumbnailUrl}
-                onChange={(e) => setEpisodeForm({ ...episodeForm, thumbnailUrl: e.target.value })}
-                className={INPUT_CLASS}
-              />
-            </div>
           </div>
         </fieldset>
+        <AssetInput
+          label="Episode thumbnail"
+          kind="image"
+          preview="thumbnail"
+          value={episodeForm.thumbnailUrl}
+          disabled={submitting}
+          onChange={(thumbnailUrl) => setEpisodeForm((f) => (f ? { ...f, thumbnailUrl } : f))}
+          onBusyChange={(busy) => setFormBusy('episode-thumbnail', busy)}
+        />
+        <p className="text-[11px] text-slate-500">The episode's video is managed from the "Video" button in the episode list.</p>
         <ErrorBanner message={formError} />
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={closeEditor}
-            disabled={submitting}
+            disabled={submitting || formUploading}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || formUploading}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : editor?.kind === 'episode' && editor.episodeId ? 'Save episode' : 'Create episode'}
+            {submitting
+              ? 'Saving…'
+              : formUploading
+                ? 'Waiting for upload…'
+                : editor?.kind === 'episode' && editor.episodeId
+                  ? 'Save episode'
+                  : 'Create episode'}
           </button>
         </div>
       </form>
     );
 
-  const renderVideoStatus = (season: Season, episode: Episode) => {
-    const code = episodeCode(season.seasonNumber, episode.episodeNumber);
+  const renderVideoStatus = (episode: Episode) => {
     const progress = uploads[episode.id];
-    const uploadError = uploadErrors[episode.id];
     const asset = latestAssets.get(episode.id);
     let body: React.ReactNode;
     if (progress !== undefined) {
@@ -661,33 +639,22 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
     } else if (!asset) {
       body = <span className="text-slate-500">No video</span>;
     } else {
-      const retrying = retryingIds.includes(asset.id);
+      const label = assetStatusLabel(asset);
       body = (
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <StatusBadge status={asset.status} />
-            {asset.status === 'COMPLETED' && (
-              <span className="text-slate-400">{formatDuration(asset.durationSeconds)}</span>
-            )}
+            {asset.status === 'COMPLETED' && <span className="text-slate-400">{formatDuration(asset.durationSeconds)}</span>}
           </div>
-          {asset.status === 'FAILED' && (
-            <>
-              {asset.failureReason && <p className="text-[11px] text-rose-300 break-words">{asset.failureReason}</p>}
-              <button onClick={() => retryTranscode(asset, code)} disabled={retrying} className={BUTTON_SECONDARY}>
-                <RotateCcw className={`w-3 h-3 ${retrying ? 'animate-spin' : ''}`} />
-                {retrying ? 'Retrying…' : 'Retry transcode'}
-              </button>
-            </>
+          {label && <p className="text-[10px] text-amber-300">{label}</p>}
+          {asset.status === 'PROCESSING' && asset.progressPercent != null && (
+            <ProgressBar percent={asset.progressPercent} compact tone="amber" />
           )}
+          {asset.status === 'FAILED' && <p className="text-[10px] text-rose-300">Transcode failed: open "Video" for details.</p>}
         </div>
       );
     }
-    return (
-      <div className="space-y-1.5 min-w-[160px] max-w-xs">
-        {body}
-        {uploadError && <p className="text-[11px] text-rose-300 break-words">{uploadError}</p>}
-      </div>
-    );
+    return <div className="space-y-1.5 min-w-[160px] max-w-xs">{body}</div>;
   };
 
   const renderSeason = (season: Season) => {
@@ -700,13 +667,22 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
     return (
       <section key={season.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 className="text-sm font-bold text-white">{seasonLabel(season)}</h4>
-            <p className="text-[11px] text-slate-500">
-              {episodes.length} episode{episodes.length === 1 ? '' : 's'}
-              {season.releaseDate ? ` · Released ${formatDate(season.releaseDate)}` : ''}
-            </p>
-            {season.synopsis && <p className="text-[11px] text-slate-400 mt-1 max-w-2xl">{season.synopsis}</p>}
+          <div className="flex items-start gap-3 min-w-0">
+            {season.posterUrl ? (
+              <img src={season.posterUrl} alt="" className="w-10 h-14 rounded object-cover bg-slate-800 border border-slate-700 shrink-0" />
+            ) : (
+              <div className="w-10 h-14 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0" title="No season poster">
+                <ImageIcon className="w-4 h-4 text-slate-600" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <h4 className="text-sm font-bold text-white">{seasonLabel(season)}</h4>
+              <p className="text-[11px] text-slate-500">
+                {episodes.length} episode{episodes.length === 1 ? '' : 's'}
+                {season.releaseDate ? ` · Released ${formatDate(season.releaseDate)}` : ''}
+              </p>
+              {season.synopsis && <p className="text-[11px] text-slate-400 mt-1 max-w-2xl">{season.synopsis}</p>}
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -754,39 +730,56 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
                   {episodes.map((episode) => {
                     const busy = busyIds.includes(episode.id) || seasonBusy;
                     const uploading = episode.id in uploads;
-                    const asset = latestAssets.get(episode.id);
-                    const assetActive = asset ? isAssetActive(asset) : false;
+                    const code = episodeCode(season.seasonNumber, episode.episodeNumber);
                     const editingThis = editor?.kind === 'episode' && editor.episodeId === episode.id;
+                    const videoMounted = mountedVideoIds.includes(episode.id);
+                    const videoOpen = openVideoIds.includes(episode.id);
                     return (
                       <React.Fragment key={episode.id}>
                         <tr className="hover:bg-slate-800/40 transition align-top">
                           <td className="px-5 py-3">
-                            <p className="font-semibold text-white">
-                              <span className="text-slate-500 font-mono mr-2">
-                                {episodeCode(season.seasonNumber, episode.episodeNumber)}
-                              </span>
-                              {episode.title}
-                            </p>
-                            {episode.synopsis && (
-                              <p className="text-[11px] text-slate-500 max-w-md line-clamp-2">{episode.synopsis}</p>
-                            )}
-                            <p className="text-[10px] text-slate-600 font-mono">{episode.id}</p>
+                            <div className="flex items-start gap-3">
+                              {episode.thumbnailUrl ? (
+                                <img
+                                  src={episode.thumbnailUrl}
+                                  alt=""
+                                  className="w-20 aspect-video rounded object-cover bg-slate-800 border border-slate-700 shrink-0"
+                                />
+                              ) : (
+                                <div
+                                  className="w-20 aspect-video rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0"
+                                  title="No thumbnail"
+                                >
+                                  <Film className="w-4 h-4 text-slate-600" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-semibold text-white">
+                                  <span className="text-slate-500 font-mono mr-2">{code}</span>
+                                  {episode.title}
+                                </p>
+                                {episode.synopsis && (
+                                  <p className="text-[11px] text-slate-500 max-w-md line-clamp-2">{episode.synopsis}</p>
+                                )}
+                                <p className="text-[10px] text-slate-600 font-mono">{episode.id}</p>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-5 py-3 text-slate-400 whitespace-nowrap">
                             {episode.runtimeMinutes != null ? `${episode.runtimeMinutes} min` : '—'}
                           </td>
                           <td className="px-5 py-3 text-slate-400 whitespace-nowrap">{formatDate(episode.releaseDate)}</td>
-                          <td className="px-5 py-3">{renderVideoStatus(season, episode)}</td>
+                          <td className="px-5 py-3">{renderVideoStatus(episode)}</td>
                           <td className="px-5 py-3">
                             <div className="flex justify-end gap-2">
                               <button
-                                onClick={() => pickVideo(season, episode)}
-                                disabled={busy || uploading || assetActive}
-                                title={assetActive ? 'A video for this episode is still uploading or transcoding' : undefined}
-                                className={BUTTON_SECONDARY}
+                                onClick={() => toggleVideoPanel(episode.id)}
+                                disabled={busy}
+                                className={videoOpen ? `${BUTTON_SECONDARY} bg-slate-800` : BUTTON_SECONDARY}
                               >
-                                <UploadCloud className="w-3 h-3" />
-                                {uploading ? 'Uploading…' : asset ? 'Replace video' : 'Upload video'}
+                                <Clapperboard className="w-3 h-3" />
+                                Video
+                                {videoOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </button>
                               <button
                                 onClick={() => openEpisodeEditor(season, episode)}
@@ -807,6 +800,24 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
                             </div>
                           </td>
                         </tr>
+                        {videoMounted && (
+                          <tr className={videoOpen ? 'bg-slate-950/40' : 'hidden'}>
+                            <td colSpan={5} className="px-5 py-4">
+                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                {code} video
+                              </p>
+                              <VideoSourceInput
+                                contentId={episode.id}
+                                contentLabel={`${show.title} · ${code} · ${episode.title}`}
+                                auditTargetType="EPISODE"
+                                asset={assetsLoaded ? latestAssets.get(episode.id) ?? null : undefined}
+                                selfPoll={false}
+                                onAssetChange={(asset) => setEpisodeAsset(episode.id, asset)}
+                                onUploadChange={(progress) => setEpisodeUpload(episode.id, progress)}
+                              />
+                            </td>
+                          </tr>
+                        )}
                         {editingThis && (
                           <tr>
                             <td colSpan={5} className="px-5 py-3">
@@ -833,8 +844,6 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
 
   return (
     <div className="space-y-6">
-      <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
-
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -893,11 +902,11 @@ export const TvShowEpisodesPage: React.FC<TvShowEpisodesPageProps> = ({ show, on
       <div className="bg-slate-900 border border-slate-800 rounded-xl px-5 py-4">
         <p className="text-xs text-slate-300 flex items-center gap-2">
           <Clapperboard className="w-4 h-4 text-red-500 shrink-0" />
-          Each episode is a playable item: its video is uploaded to the media service under the episode id and transcoded to HLS. Server limit: 500 MB.
+          Each episode is a playable item: open "Video" to upload a file (sent in chunks, any size) or import it from a direct link.
+          It is stored in object storage and transcoded to HLS; subscribers can stream it once COMPLETED and the show is PUBLISHED.
         </p>
-        <UploadLimitsNote />
         {hasActiveEpisodeAssets && (
-          <p className="text-[11px] text-slate-500 mt-1">Video status auto-refreshes every 10s while episodes are uploading or transcoding.</p>
+          <p className="text-[11px] text-slate-500 mt-1">Video status auto-refreshes every 5s while episodes are downloading or transcoding.</p>
         )}
       </div>
 

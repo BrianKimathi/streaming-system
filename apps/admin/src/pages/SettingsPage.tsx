@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Globe, KeyRound, LogOut, Loader2, Info, User } from 'lucide-react';
+import { Shield, Globe, KeyRound, LogOut, Loader2, Info, User, Wallet } from 'lucide-react';
 import { API_BASE_URL, STORAGE_KEYS } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime, humanizeRole } from '../utils/format';
@@ -46,7 +46,7 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
   </div>
 );
 
-export const SettingsPage: React.FC = () => {
+export const SettingsPage: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
   const { token, accountId, email, roles, logout } = useAuth();
   const [now, setNow] = useState(() => Date.now());
   const [signingOut, setSigningOut] = useState(false);
@@ -149,11 +149,30 @@ export const SettingsPage: React.FC = () => {
         </dl>
       </div>
 
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-emerald-400" />
+            Payments (M-Pesa)
+          </h4>
+          <p className="text-xs text-slate-400 mt-1">
+            Daraja consumer key, secret, passkey, shortcode and callback URL used for subscription checkout.
+          </p>
+        </div>
+        <button
+          onClick={() => onNavigate?.('payments')}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition"
+        >
+          Open payment settings
+        </button>
+      </div>
+
       <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-start gap-3">
         <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
         <p className="text-xs text-slate-400 leading-relaxed">
           Platform configuration such as the JWT signing key, SMTP credentials and admin bootstrap credentials lives in
-          server environment variables. It is intentionally not exposed to or editable from the browser.
+          server environment variables. It is intentionally not exposed to or editable from the browser. M-Pesa credentials are
+          the exception: they are managed on the Payments page, encrypted on the server and never sent back to the browser.
         </p>
       </div>
 

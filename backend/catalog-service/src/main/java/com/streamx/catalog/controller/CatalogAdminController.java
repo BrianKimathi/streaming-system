@@ -25,6 +25,23 @@ public class CatalogAdminController {
         return ResponseEntity.ok(ApiResponse.success(catalogAdminService.listAllMovies()));
     }
 
+    @GetMapping("/movies/{id}")
+    public ResponseEntity<ApiResponse<MovieResponse>> getMovie(@PathVariable("id") String id) {
+        return ResponseEntity.ok(ApiResponse.success(catalogAdminService.getMovie(id)));
+    }
+
+    @PutMapping("/movies/{id}")
+    public ResponseEntity<ApiResponse<MovieResponse>> updateMovie(
+            @PathVariable("id") String id, @Valid @RequestBody CreateMovieRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Movie updated", catalogAdminService.updateMovie(id, request)));
+    }
+
+    @DeleteMapping("/movies/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteMovie(@PathVariable("id") String id) {
+        catalogAdminService.deleteMovie(id);
+        return ResponseEntity.ok(ApiResponse.success("Movie deleted", null));
+    }
+
     @PatchMapping("/movies/{id}/status")
     public ResponseEntity<ApiResponse<MovieResponse>> updateMovieStatus(
             @PathVariable("id") String id, @Valid @RequestBody UpdateContentStatusRequest request) {
@@ -45,6 +62,18 @@ public class CatalogAdminController {
     @PostMapping("/tv-shows")
     public ResponseEntity<ApiResponse<TvShowResponse>> createTvShow(@Valid @RequestBody CreateTvShowRequest request) {
         return ResponseEntity.ok(ApiResponse.success("TV show created", catalogAdminService.createTvShow(request)));
+    }
+
+    @PutMapping("/tv-shows/{id}")
+    public ResponseEntity<ApiResponse<TvShowResponse>> updateTvShow(
+            @PathVariable("id") String id, @Valid @RequestBody CreateTvShowRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("TV show updated", catalogAdminService.updateTvShow(id, request)));
+    }
+
+    @DeleteMapping("/tv-shows/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteTvShow(@PathVariable("id") String id) {
+        catalogAdminService.deleteTvShow(id);
+        return ResponseEntity.ok(ApiResponse.success("TV show deleted", null));
     }
 
     @PatchMapping("/tv-shows/{id}/status")

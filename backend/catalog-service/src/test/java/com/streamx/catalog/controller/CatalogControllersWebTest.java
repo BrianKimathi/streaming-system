@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -56,6 +57,28 @@ class CatalogControllersWebTest {
                 .andExpect(jsonPath("$.errors.title").exists())
                 .andExpect(jsonPath("$.errors.runtimeMinutes").exists());
         verifyNoInteractions(catalogAdminService);
+    }
+
+    @Test
+    void mediaUrls_mustBeHttpLinks() throws Exception {
+        mockMvc.perform(put("/api/v1/catalog/admin/movies/{id}", "00000000-0000-0000-0000-000000000001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"T\",\"posterUrl\":\"javascript:alert(1)\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.posterUrl").exists());
+        mockMvc.perform(post("/api/v1/catalog/admin/seasons/{id}/episodes", "00000000-0000-0000-0000-000000000001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"episodeNumber\":1,\"title\":\"E\",\"thumbnailUrl\":\"https://x.example/" + "a".repeat(2000) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.thumbnailUrl").exists());
+        verifyNoInteractions(catalogAdminService);
+
+        mockMvc.perform(put("/api/v1/catalog/admin/movies/{id}", "00000000-0000-0000-0000-000000000001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"T\",\"posterUrl\":\"https://streamxapi.briankimathi.dev/api/v1/media/files/1/p.jpg\","
+                                + "\"trailerUrl\":\"\"}"))
+                .andExpect(status().isOk());
+        verify(catalogAdminService).updateMovie(eq("00000000-0000-0000-0000-000000000001"), any());
     }
 
     @Test

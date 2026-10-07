@@ -1,5 +1,9 @@
 server:
   port: 8087
+  tomcat:
+    # Upload parts are raw 32 MiB bodies; let Tomcat drain a rejected part so the client still reads the error.
+    max-swallow-size: 40MB
+    max-http-form-post-size: 2MB
 
 spring:
   application:
@@ -13,20 +17,34 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   servlet:
     multipart:
-      max-file-size: 500MB
-      max-request-size: 500MB
+      enabled: false
 
 media:
-  storage-path: ${MEDIA_STORAGE_PATH:./media-storage}
   ffmpeg-path: ${MEDIA_FFMPEG_PATH:ffmpeg}
   ffprobe-path: ${MEDIA_FFPROBE_PATH:ffprobe}
   transcode-threads: ${MEDIA_TRANSCODE_THREADS:2}
   transcode-timeout-minutes: ${MEDIA_TRANSCODE_TIMEOUT_MINUTES:240}
+  work-dir: ${MEDIA_WORK_DIR:./media-work}
+  public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
+  chunk-size-bytes: 33554432
+  max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:21474836480}
+  max-trailer-bytes: ${MEDIA_MAX_TRAILER_BYTES:2147483648}
+  max-image-bytes: ${MEDIA_MAX_IMAGE_BYTES:20971520}
+  upload-session-ttl-hours: 24
+  import-connect-timeout-seconds: 15
+  import-read-timeout-seconds: 60
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+    bucket: ${MINIO_BUCKET:streamx-media}
+    region: ${MINIO_REGION:us-east-1}
 
 jwt:
   secret: ${JWT_SECRET:9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a}

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/theme/app_theme.dart';
@@ -88,8 +89,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
   }
 
   Future<void> _openTrailer(String url) async {
-    final path = Uri.parse(url).path.toLowerCase();
-    if (path.endsWith('.m3u8') || path.endsWith('.mp4')) {
+    if (AppConfig.isDirectVideoUrl(url)) {
       context.push('/play', extra: PlayerArgs.trailer(title: '${_title.title} – Trailer', url: url));
       return;
     }
@@ -115,8 +115,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
         formatRuntime(_title.runtimeMinutes),
     ];
 
-    final trailer = _title.trailerUrl;
-    final hasTrailer = TitleArtwork.isHttpUrl(trailer);
+    final trailer = AppConfig.resolveMediaUrl(_title.trailerUrl);
 
     final seasons = show?.seasons ?? const <Season>[];
     final seasonIndex = (_userSeason != null && _userSeason! < seasons.length)
@@ -222,11 +221,11 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                       },
                     ),
                   ),
-                  if (hasTrailer) ...[
+                  if (trailer != null) ...[
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _openTrailer(trailer!.trim()),
+                        onPressed: () => _openTrailer(trailer),
                         icon: const Icon(Icons.movie_outlined),
                         label: const Text('Trailer'),
                       ),

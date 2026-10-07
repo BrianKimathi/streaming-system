@@ -3,12 +3,13 @@ package com.streamx.billing.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/**
+ * Environment-provided Daraja settings. Code must read the effective configuration from
+ * {@link com.streamx.billing.mpesa.MpesaConfigProvider}, where admin-saved database values take precedence.
+ */
 @Component
 @ConfigurationProperties(prefix = "mpesa")
 public class MpesaProperties {
-
-    static final String SANDBOX_BASE_URL = "https://sandbox.safaricom.co.ke";
-    static final String PRODUCTION_BASE_URL = "https://api.safaricom.co.ke";
 
     private String environment = "sandbox";
     private String consumerKey;
@@ -18,31 +19,6 @@ public class MpesaProperties {
     private String transactionType = "CustomerPayBillOnline";
     private String callbackBaseUrl;
     private String callbackToken;
-
-    public boolean isConfigured() {
-        return hasText(consumerKey) && hasText(consumerSecret) && hasText(shortcode)
-                && hasText(passkey) && hasText(callbackToken) && hasText(callbackBaseUrl);
-    }
-
-    public String getBaseUrl() {
-        return "production".equalsIgnoreCase(trim(environment)) ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL;
-    }
-
-    public String getCallbackUrl() {
-        String base = trim(callbackBaseUrl);
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return base + "/" + trim(callbackToken);
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
-    private static String trim(String value) {
-        return value == null ? "" : value.trim();
-    }
 
     public String getEnvironment() {
         return environment;

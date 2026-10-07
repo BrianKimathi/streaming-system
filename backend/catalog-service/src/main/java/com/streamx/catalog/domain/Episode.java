@@ -28,6 +28,7 @@ public class Episode {
 
     private Integer runtimeMinutes;
     private LocalDate releaseDate;
+    @Column(length = 2000)
     private String thumbnailUrl;
     private String mediaAssetUrl;
 

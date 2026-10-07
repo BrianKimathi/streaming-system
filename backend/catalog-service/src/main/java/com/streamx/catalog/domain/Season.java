@@ -26,6 +26,7 @@ public class Season {
     private String synopsis;
 
     private LocalDate releaseDate;
+    @Column(length = 2000)
     private String posterUrl;
 
     public Season() {

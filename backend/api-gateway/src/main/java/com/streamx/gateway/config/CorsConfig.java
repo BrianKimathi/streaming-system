@@ -16,7 +16,7 @@ public class CorsConfig {
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.setAllowedOriginPatterns(List.of("*"));
-        corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        corsConfig.setAllowedMethods(Arrays.asList("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(List.of("*"));
         corsConfig.setAllowCredentials(true);
         corsConfig.setMaxAge(3600L);

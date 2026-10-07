@@ -58,6 +58,21 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    # MinIO stopped publishing community images; this is the maintained community build (github.com/pgsty/minio).
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: streamx-minio
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    ports:
+      # Console only, for SSH tunnels; the S3 API stays on the Docker network.
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-19001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in backend/.env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in backend/.env}
+    volumes:
+      - minio_data:/data
+
   auth-service:
     <<: *java-service
     build:
@@ -134,6 +149,7 @@ services:
       MPESA_TRANSACTION_TYPE: ${MPESA_TRANSACTION_TYPE:-CustomerPayBillOnline}
       MPESA_CALLBACK_BASE_URL: ${MPESA_CALLBACK_BASE_URL:-https://streamxapi.briankimathi.dev/api/v1/billing/mpesa/callback}
       MPESA_CALLBACK_TOKEN: ${MPESA_CALLBACK_TOKEN:-}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
 
   device-service:
     <<: *java-service
@@ -158,12 +174,24 @@ services:
     environment:
       <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/media_db
-      MEDIA_STORAGE_PATH: /app/media-storage
+      JAVA_TOOL_OPTIONS: ${MEDIA_JAVA_OPTS:--Xmx256m -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=200m -XX:ReservedCodeCacheSize=48m}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in backend/.env}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in backend/.env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-streamx-media}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-https://streamxapi.briankimathi.dev}
+      MEDIA_WORK_DIR: /app/media-work
       MEDIA_TRANSCODE_THREADS: ${MEDIA_TRANSCODE_THREADS:-2}
-      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${MEDIA_MAX_UPLOAD:-2GB}
-      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${MEDIA_MAX_UPLOAD:-2GB}
+      MEDIA_MAX_VIDEO_BYTES: ${MEDIA_MAX_VIDEO_BYTES:-21474836480}
+      MEDIA_MAX_TRAILER_BYTES: ${MEDIA_MAX_TRAILER_BYTES:-2147483648}
+      MEDIA_MAX_IMAGE_BYTES: ${MEDIA_MAX_IMAGE_BYTES:-20971520}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
     volumes:
-      - media_data:/app/media-storage
+      - media_work:/app/media-work
 
   playback-service:
     <<: *java-service
@@ -298,4 +326,5 @@ services:
 
 volumes:
   postgres_data:
-  media_data:
+  minio_data:
+  media_work:

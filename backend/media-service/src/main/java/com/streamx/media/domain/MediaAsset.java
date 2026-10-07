@@ -31,6 +31,14 @@ public class MediaAsset {
     @Column(length = 2000)
     private String failureReason;
 
+    @Column(length = 2000)
+    private String sourceUrl;
+
+    private Integer progressPercent;
+
+    /** Upload session whose parts still have to be assembled into {@link #storagePath}. */
+    private UUID pendingUploadId;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -132,6 +140,30 @@ public class MediaAsset {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public Integer getProgressPercent() {
+        return progressPercent;
+    }
+
+    public void setProgressPercent(Integer progressPercent) {
+        this.progressPercent = progressPercent;
+    }
+
+    public UUID getPendingUploadId() {
+        return pendingUploadId;
+    }
+
+    public void setPendingUploadId(UUID pendingUploadId) {
+        this.pendingUploadId = pendingUploadId;
     }
 
     public LocalDateTime getCreatedAt() {

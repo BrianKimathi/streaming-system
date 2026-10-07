@@ -15,8 +15,11 @@ public class CreateMovieRequest {
     private LocalDate releaseDate;
     private Integer runtimeMinutes;
     private String maturityRating;
+    @MediaUrl
     private String posterUrl;
+    @MediaUrl
     private String backdropUrl;
+    @MediaUrl
     private String trailerUrl;
     private String mediaAssetUrl;
     private ContentStatus status = ContentStatus.DRAFT;

@@ -24,8 +24,11 @@ public class TvShow {
 
     private LocalDate releaseDate;
     private String maturityRating;
+    @Column(length = 2000)
     private String posterUrl;
+    @Column(length = 2000)
     private String backdropUrl;
+    @Column(length = 2000)
     private String trailerUrl;
 
     @Enumerated(EnumType.STRING)

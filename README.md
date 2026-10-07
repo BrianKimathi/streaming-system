@@ -1,17 +1,23 @@
-# StreamX: Event-Driven Microservices Video Streaming Platform
+# StreamX: Microservices Video Streaming Platform
 
 ![Java 24](https://img.shields.io/badge/Java-24-orange.svg)
 ![Spring Boot 3.4](https://img.shields.io/badge/Spring_Boot-3.4.3-brightgreen.svg)
 ![React 18](https://img.shields.io/badge/React-18-blue.svg)
-![Vite 6](https://img.shields.io/badge/Vite-6-purple.svg)
-![TypeScript 5](https://img.shields.io/badge/TypeScript-5-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-blue.svg)
+![Flutter 3.38](https://img.shields.io/badge/Flutter-3.38-02569B.svg)
+![MinIO](https://img.shields.io/badge/Storage-MinIO-C72E49.svg)
+![M-Pesa](https://img.shields.io/badge/Payments-M--Pesa_STK_Push-4CAF50.svg)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)
 
-**StreamX** is an enterprise-grade, Netflix-inspired event-driven video streaming microservices platform built using **Java 24**, **Spring Boot 3.4**, **PostgreSQL**, **Redis**, **Apache Kafka**, **Docker**, **Kubernetes**, and a dedicated **Vite + React + TypeScript** Administrative Control Plane.
+**StreamX** is a Netflix-style video streaming platform made of Java 24 / Spring Boot 3.4 microservices, a React + TypeScript admin portal, and a Flutter mobile app for Android and iOS.
 
-The platform features strict service isolation with independent per-service databases, dynamic data-driven subscription plans with decoupled entitlement resolution, profile-centric cross-device watch history sync, adaptive HTTP Live Streaming (HLS), velocity-based trending content calculation, real-time analytics aggregation, multi-channel notifications, fine-grained Role-Based Access Control (RBAC), immutable system audit logging, feature flag percentage rollouts, customer support ticket management, platform health monitoring, and centralized JWT security at the API Gateway.
+Admins upload movies, episodes, trailers, posters and backdrops (or paste links), the media service stores them in MinIO and transcodes video to adaptive HLS, and subscribers pay with M-Pesa STK Push and watch in a full-screen mobile player with resume, skip, and next-episode autoplay.
+
+Every screen in the admin portal and the mobile app reads live data from the API. There is no mock, sample or optimistic data anywhere. Features whose provider is not configured (M-Pesa, SMTP) fail honestly with a clear error instead of pretending to succeed.
+
+Production:
+
+- API gateway: `https://streamxapi.briankimathi.dev/api/v1`
+- Admin portal: `https://streamxadmin.briankimathi.dev`
 
 ---
 
@@ -19,220 +25,294 @@ The platform features strict service isolation with independent per-service data
 
 ```
 streaming-system/
-├── backend/                        # 16 Java 24 & Spring Boot 3.4 Microservice Modules
-│   ├── admin-service/              # Central Operational Control Plane & Admin APIs (Port 8093)
-│   ├── analytics-service/          # Real-time Analytics & Business Metrics Aggregation (Port 8091)
-│   ├── api-gateway/                # Reactive API Gateway & JWT Filter (Port 8080)
-│   ├── auth-service/               # Authentication, Account JWTs & OTP Verification (Port 8081)
-│   ├── billing-service/            # Payment Processing, Status Tracking & Refund Control (Port 8085)
-│   ├── catalog-service/            # Movies, TV Shows, Seasons, Episodes & Genres (Port 8083)
-│   ├── common/                     # Shared DTOs, Security Constants & Audit Event Envelopes
-│   ├── device-service/             # Device Fingerprinting & Registered Session Limits (Port 8086)
-│   ├── media-service/              # Asset Ingestion & FFmpeg HLS Transcoding Pipeline (Port 8087)
-│   ├── notification-service/       # Email & SMS Notification Engine (Port 8092)
-│   ├── playback-service/           # Playback Authorization & Session Tokens (Port 8088)
-│   ├── subscription-service/       # Plan Management, Immutable Versioning & Entitlements (Port 8084)
-│   ├── trending-service/           # Velocity Score Intelligence & Top Content Calculation (Port 8090)
-│   ├── user-service/               # Profile Management, Kids Mode & 4-Digit PIN Security (Port 8082)
-│   ├── watch-history-service/      # Profile Watch State & "Continue Watching" Sync (Port 8089)
-│   ├── docker-compose.yml          # Full Multi-Container Orchestration Manifest
-│   ├── pom.xml                     # Parent Maven Project Configuration
-│   └── scripts/                    # Database Initializer Scripts (init-db.sql)
-├── apps/
-│   ├── admin/                      # StreamX Admin Portal SPA (Vite 6, React 18, TypeScript, Tailwind)
-│   └── mobile/                     # Upcoming StreamX Mobile & TV Client Application (Flutter)
-├── k8s/                            # Production Kubernetes Deployment Manifests
-└── .github/workflows/              # GitHub Actions CI/CD Pipeline Configuration
+|-- apps/
+|   |-- admin/                  Admin portal SPA (Vite 6, React 18, TypeScript, Tailwind, hls.js)
+|   `-- mobile/                 Subscriber app (Flutter 3.38, Android + iOS), see apps/mobile/README.md
+|-- backend/
+|   |-- api-gateway/            Spring Cloud Gateway, JWT filter, routing, CORS (8080)
+|   |-- auth-service/           Accounts, JWTs, refresh tokens, admin bootstrap (8081)
+|   |-- user-service/           Profiles, Kids mode, 4-digit PIN, profile tokens (8082)
+|   |-- catalog-service/        Movies, TV shows, seasons, episodes, genres, watchlist (8083)
+|   |-- subscription-service/   Plans, plan versions, subscriptions, entitlements (8084)
+|   |-- billing-service/        M-Pesa STK Push checkout, callbacks, refunds, M-Pesa settings (8085)
+|   |-- device-service/         Device registration and device limits (8086)
+|   |-- media-service/          MinIO uploads, link imports, FFmpeg HLS transcoding, streaming (8087)
+|   |-- playback-service/       Playback authorization, stream tokens, concurrent stream limits (8088)
+|   |-- watch-history-service/  Per-profile progress and Continue Watching (8089)
+|   |-- trending-service/       Velocity-based trending scores (8090)
+|   |-- analytics-service/      Live aggregation of users, watch time and revenue (8091)
+|   |-- notification-service/   Email (SMTP) and in-app notifications (8092)
+|   |-- admin-service/          Audit log, feature flags, incidents, tickets, platform health (8093)
+|   |-- common/                 Shared DTOs (ApiResponse), JWT utilities, enums, exceptions
+|   |-- k8s/                    Kubernetes manifests (see the Kubernetes section)
+|   |-- scripts/init-db.sql     Creates one PostgreSQL database per service
+|   |-- docker-compose.yml      Full stack: PostgreSQL, Redis, MinIO, all services, admin portal
+|   `-- .env.example            Every deployment variable, documented
+`-- .github/workflows/          CI (ci-cd.yml) and SSH deploy (deploy.yml)
 ```
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```mermaid
 flowchart TD
-    Client[Web / Mobile / TV Clients] -->|HTTP / REST| Gateway[API Gateway :8080]
-    AdminWeb[Admin Control Plane Web SPA] -->|HTTP / REST| Gateway
+    Mobile[Flutter mobile app] -->|HTTPS| Gateway[API Gateway :8080]
+    AdminWeb[Admin portal SPA] -->|HTTPS| Gateway
 
-    subgraph Security & Access
-        Gateway -->|Route & JWT Validation| Auth[Auth Service :8081]
-        Gateway -->|Route & Profile Scope| User[User Service :8082]
-        Gateway -->|RBAC & Operational Scope| Admin[Admin Service :8093]
+    subgraph Identity
+        Gateway --> Auth[auth-service]
+        Gateway --> User[user-service]
     end
 
-    subgraph Content & Subscriptions
-        Gateway --> Catalog[Catalog Service :8083]
-        Gateway --> Subscription[Subscription Service :8084]
-        Gateway --> Billing[Billing Service :8085]
-        Gateway --> Device[Device Service :8086]
+    subgraph Content and commerce
+        Gateway --> Catalog[catalog-service]
+        Gateway --> Subscription[subscription-service]
+        Gateway --> Billing[billing-service]
+        Gateway --> Device[device-service]
     end
 
-    subgraph Media & Streaming
-        Gateway --> Media[Media Service :8087]
-        Gateway --> Playback[Playback Service :8088]
-        Gateway --> WatchHistory[Watch History Service :8089]
+    subgraph Streaming
+        Gateway --> Playback[playback-service]
+        Gateway --> Media[media-service]
+        Gateway --> WatchHistory[watch-history-service]
     end
 
-    subgraph Intelligence & System Services
-        Gateway --> Trending[Trending Service :8090]
-        Gateway --> Analytics[Analytics Service :8091]
-        Gateway --> Notification[Notification Service :8092]
+    subgraph Insight and operations
+        Gateway --> Trending[trending-service]
+        Gateway --> Analytics[analytics-service]
+        Gateway --> Notification[notification-service]
+        Gateway --> Admin[admin-service]
     end
 
-    subgraph Infrastructure Layer
-        PostgreSQL[(14 PostgreSQL Databases)]
-        Redis[(Redis Cache)]
-        Kafka{{Apache Kafka Event Bus}}
+    subgraph Infrastructure
+        PostgreSQL[(PostgreSQL 16, one database per service)]
+        Redis[(Redis 7)]
+        MinIO[(MinIO bucket streamx-media)]
     end
 
-    Auth & User & Catalog & Subscription & Billing & Device & Media & Playback & WatchHistory & Trending & Analytics & Notification & Admin --> PostgreSQL
-    Playback & WatchHistory & Gateway --> Redis
-    Playback & WatchHistory & Billing & Media & Admin --> Kafka
+    Media --> MinIO
+    Playback -->|entitlements, devices, media status| Subscription & Device & Media
+    Billing -->|STK Push, OAuth| Daraja[Safaricom Daraja API]
+    Daraja -->|payment callback| Gateway
+    Billing -->|activate subscription| Subscription
 ```
 
----
-
-## System Microservices Inventory
-
-| Microservice | Port | Database | Primary Responsibility |
-| :--- | :--- | :--- | :--- |
-| **`common`** | N/A | None | Shared DTOs (`ApiResponse`, `EventEnvelope`), `JwtUtils`, exceptions, and `AdminRole` definitions. |
-| **`auth-service`** | `8081` | `auth_db` | Account registration, authentication, JWT tokens, 6-digit hashed OTP phone verification. |
-| **`user-service`** | `8082` | `user_db` | Profile management (Adult/Kids), 4-digit hashed PIN locking, profile-scoped token generation. |
-| **`catalog-service`** | `8083` | `catalog_db` | Movies, TV Shows, Seasons, Episodes, Genres, and lifecycle status (`DRAFT` to `PUBLISHED`). |
-| **`subscription-service`**| `8084` | `subscription_db` | Data-driven plan management, immutable plan versioning, decoupled entitlement resolution. |
-| **`billing-service`** | `8085` | `billing_db` | Payment transaction processing via `PaymentProvider`, payment status tracking, and refunds. |
-| **`device-service`** | `8086` | `device_db` | Device fingerprint registration, active session tracking, and max registered device enforcement. |
-| **`media-service`** | `8087` | `media_db` | Asset ingestion, FFmpeg HLS transcoding (`.m3u8` master/variant playlists and `.ts` segments). |
-| **`playback-service`** | `8088` | `playback_db` | Playback authorization, temporary stream token issuance, concurrent stream limits enforcement. |
-| **`watch-history-service`**| `8089` | `watch_history_db` | Profile-centric progress synchronization, "Continue Watching" carousel, $\ge 90\%$ completion thresholding. |
-| **`trending-service`** | `8090` | `trending_db` | Velocity scoring algorithm calculating real-time top trending catalog items. |
-| **`analytics-service`** | `8091` | `analytics_db` | Aggregation of DAU, MAU, total watch time hours, completion rates, and platform revenue. |
-| **`notification-service`** | `8092` | `notification_db` | Multi-channel user notifications (Email, SMS) for welcome, OTP, and payment alerts. |
-| **`admin-service`** | `8093` | `admin_db` | Audit logging, feature flag percentage rollouts, incident center, ticket management, platform health. |
-| **`api-gateway`** | `8080` | None | Central entrypoint with reactive `JwtAuthenticationFilter`, routing, and header enrichment. |
+Services talk to each other over internal HTTP endpoints (`/api/v1/{service}/internal/**`). The gateway answers 404 for every internal path, so they are only reachable inside the Docker network.
 
 ---
 
-## Administrative Control Plane & RBAC Roles
+## Security Model
 
-The **StreamX Admin Portal** (`apps/admin`) is a single-page operational control platform following zero-gradient flat styling, Lucide icons, page-based navigation, and zero dummy/unbacked buttons.
+- **Gateway JWT filter.** Every request except an explicit allow-list of public routes (sign-in, sign-up, refresh, the published catalog, the M-Pesa callback, public media files, HLS streams) needs a valid access token. The gateway strips client-supplied `X-User-*` headers and re-adds identity headers from the verified token, so services never trust spoofed identity.
+- **Admin routes.** `/api/v1/{service}/admin/**` requires an admin role in the token. The admin account is created or updated on auth-service startup from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; there is no self-service admin sign-up.
+- **Profile tokens.** After choosing a profile the mobile app carries a profile-scoped token, so watch history, My List and maturity limits are enforced per profile.
+- **Stream tokens.** `POST /playback/request` checks the subscription, the registered device and the concurrent stream limit, then returns a short-lived JWT of type `stream` bound to one title. The HLS URL embeds it: `/api/v1/media/stream/{token}/{contentId}/{file}`. A token for one title cannot open another.
+- **Server-side truth.** Prices, plan limits, roles and ids are never taken from the client. Checkout reads the price from the plan; entitlements come from subscription-service.
+- **Secrets.** No secret is committed or shipped to the admin bundle. M-Pesa credentials saved from the admin panel are encrypted at rest (AES-256-GCM) and only ever returned masked.
 
-### RBAC Roles Matrix
+### Admin roles
 
-1. **`SUPER_ADMIN`**: Unrestricted access across all operational modules, security settings, role assignments, emergency platform operations, and maintenance mode controls.
-2. **`ADMIN`**: Operational platform administration covering accounts, suspension/blocking, content management, device management, and notifications.
-3. **`CONTENT_MANAGER`**: Catalog lifecycle management, draft/published toggles, media transcoding inspection, collection merchandising, and episode scheduling.
-4. **`FINANCE_MANAGER`**: Transaction auditing, subscription plan versioning, revenue analytics, payment provider status, and reason-based refund processing.
-5. **`SUPPORT_AGENT`**: Account context investigation, support ticket assignment, status updates, and customer issue resolution.
-6. **`MODERATOR`**: Account flagging, review moderation, abuse report handling, and account suspension workflows.
-7. **`ANALYST`**: Read-only analytics dashboards, velocity metrics, streaming quality reports, and retention statistics.
-
----
-
-## Core Technical Features
-
-### 1. Java 24 Modern Microservices Architecture
-Written in pure **Java 24** without Lombok annotation processor constraints. All domain models, DTOs, services, and tests use explicit, standard Java constructors, getters, setters, and SLF4J logging abstractions.
-
-### 2. Profile-Centric Watch History & Seamless Resumption
-Watch progress is isolated at the **Profile** level rather than Account level. A user can start a movie on their TV profile, pause at 45 minutes, and resume at the exact second on a mobile device profile.
-
-### 3. Velocity-Based Content Trending Algorithm
-The `trending-service` ranks content in real time using a dynamic velocity formula:
-$$\text{Score} = (5 \times \text{views}_{1\text{h}}) + (3 \times \text{views}_{6\text{h}}) + (2 \times \text{completions}_{24\text{h}}) + (1 \times \text{likes}_{24\text{h}})$$
-
-### 4. Decoupled Entitlements & Immutable Plan Versioning
-Downstream services inspect granular entitlement claims (`max_concurrent_streams`, `max_registered_devices`, `max_resolution_4k`). Subscriptions support immutable plan versioning so active subscriber terms remain unchanged when plans update.
-
-### 5. Adaptive HLS Video Transcoding
-The `media-service` generates HLS playlists (`master.m3u8`, variant playlists for 1080p, 720p, 480p, and `.ts` chunk files), enabling smooth, adaptive bitrate video playback.
-
-### 6. Immutable System Audit Trail & Correlation Identifiers
-Every administrative mutation generates an immutable `AuditLog` entry in `admin_db` containing the administrator ID, email, assigned role, action code, target resource type and ID, explicit rationale/reason string, IP address, and correlation ID.
+Defined in `common` (`AdminRole`): `SUPER_ADMIN`, `ADMIN`, `CONTENT_MANAGER`, `FINANCE_MANAGER`, `SUPPORT_AGENT`, `MODERATOR`, `ANALYST`. Every admin mutation is written to the admin-service audit log with the admin's id, email, role, action, target and reason.
 
 ---
 
-## Local Development & Setup
+## Media Pipeline (MinIO + FFmpeg + HLS)
 
-### Prerequisites
-- **JDK 24** installed (`java -version` returns 24)
-- **Node.js v20+** and **npm** (for `apps/admin`)
-- **Apache Maven 3.9+** or Maven Wrapper
-- **Docker & Docker Compose** (for running database & messaging infrastructure)
+All media lives in one private MinIO bucket, `streamx-media`:
 
-### 1. Build and Run Backend Unit Tests
-To compile all 16 microservices and run unit test suites:
-```bash
-cd backend
-mvn clean test
-```
+| Key prefix | Contents |
+| :--- | :--- |
+| `uploads/` | In-progress chunked uploads |
+| `originals/{contentId}/` | Original video files |
+| `hls/{contentId}/` | `master.m3u8`, variant playlists and `.ts` segments |
+| `files/{fileId}/{filename}` | Posters, backdrops, thumbnails and trailers |
 
-### 2. Run Admin Control Plane SPA
-To run the Web Admin Portal locally in development mode:
+**Uploads.** The admin portal uploads any file in 32 MiB parts, which keeps each request under Cloudflare's 100 MB body limit and lets multi-gigabyte movies upload reliably:
+
+1. `POST /media/admin/uploads` opens a session (kind `VIDEO`, `TRAILER` or `IMAGE`, size limits checked up front).
+2. `PUT /media/admin/uploads/{id}/parts/{n}` streams each part straight to MinIO.
+3. `POST /media/admin/uploads/{id}/complete` assembles the object. Images and trailers return a public URL immediately; videos start an FFmpeg transcode in the background.
+4. `DELETE /media/admin/uploads/{id}` aborts and cleans up.
+
+**Links.** Instead of uploading, an admin can paste a link. For artwork and trailers the link is stored as-is. For videos, `POST /media/admin/imports` downloads a direct file link (http/https, with an SSRF guard that refuses private, loopback and metadata addresses) into MinIO and transcodes it.
+
+**Transcoding.** FFmpeg produces 1080p, 720p and 480p H.264 renditions (never upscaled) plus a master playlist. The admin Media Pipeline page shows progress and failure reasons, and an admin preview endpoint returns a short-lived stream URL so the built-in hls.js player can check the result before publishing.
+
+**Delivery.**
+
+- Video: `GET /api/v1/media/stream/{token}/{contentId}/{file}`, served from MinIO and authorized by the stream token.
+- Artwork and trailers: `GET /api/v1/media/files/{fileId}/{filename}`, public, with `Range` support (206), `ETag`, and immutable caching so Cloudflare and the apps cache them.
+
+---
+
+## Admin Portal (`apps/admin`)
+
+- **Dashboard** with live counts from the services (no placeholder stats).
+- **Catalog.** Create, edit and publish movies and TV shows. Each asset field (video, trailer, poster, backdrop, episode thumbnail) accepts either an upload with a progress bar or a link. Seasons and episodes are managed per show, each episode with its own video. Navigating away during an upload asks for confirmation.
+- **Media Pipeline.** Transcode jobs, status, errors, and an HLS preview player.
+- **Plans and subscriptions.** Data-driven plans with immutable versions (price, max resolution, streams, devices, profiles).
+- **Payments (M-Pesa).** Under Settings, enter the Daraja consumer key and secret, shortcode, passkey, environment (sandbox or production) and transaction type. Secrets are write-only and shown masked. A **Test connection** button requests a Daraja OAuth token without charging anyone. Values saved here override the `MPESA_*` environment variables field by field, and clearing them falls back to the environment.
+- **Billing.** Transactions, statuses, M-Pesa receipt numbers and reason-based refunds.
+- **Accounts, devices, notifications, tickets, incidents, feature flags, audit log and platform health.**
+
+Run it locally:
+
 ```bash
 cd apps/admin
 npm install
-npm run dev
-```
-To verify production build compilation:
-```bash
-cd apps/admin
-npm run build
+npm run dev          # Vite dev server
+npm run build        # production build
 ```
 
-### 3. Run Infrastructure with Docker Compose
-Start PostgreSQL, Redis, and Apache Kafka containers locally:
+---
+
+## Mobile App (`apps/mobile`)
+
+The Flutter app covers the whole subscriber journey against the live API: sign up and sign in, profile picker with Kids mode and PIN, home rows (Continue Watching, Trending, New, TV Shows, genres), search, title details with trailer, seasons and episodes, My List, plans, M-Pesa checkout, billing history, devices, notifications and settings.
+
+The player behaves like a streaming service player:
+
+- Opens in landscape full screen and returns to portrait on exit.
+- Play and pause, 10 second back and forward buttons, and double-tap seeking that accumulates (+10, +20, +30 s).
+- Scrubber with buffered range, playback speed, and screen lock.
+- Episodes panel with season switcher, a "Next Episode" button, a "Next Episode" pill in the last 20 seconds, and a 5 second autoplay countdown when the episode ends.
+- Resumes from the saved position and syncs progress to watch-history-service.
+
+See [`apps/mobile/README.md`](apps/mobile/README.md) for build options, the checkout flow and session handling.
+
 ```bash
-cd backend
-docker compose up -d postgres redis kafka
+cd apps/mobile
+flutter pub get
+flutter run                                   # production API
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1   # local gateway from the Android emulator
+flutter test
 ```
 
-### 4. Run Entire Stack with Docker Compose
-To build and run all 14 microservice containers and infrastructure simultaneously:
+---
+
+## Payments: M-Pesa STK Push
+
+1. The app calls `POST /billing/checkout {planId, phoneNumber}`. billing-service reads the price from the plan and sends an STK Push through Daraja.
+2. The subscriber enters their M-Pesa PIN on their phone.
+3. Safaricom calls `MPESA_CALLBACK_BASE_URL/{MPESA_CALLBACK_TOKEN}`. The callback route is public, so the random token in the path authenticates it.
+4. On success the transaction is marked `COMPLETED` with the receipt number and the subscription is activated. The app polls the transaction until it settles.
+
+Free plans activate directly without a payment. Without credentials (neither admin settings nor environment), checkout returns 503 "M-Pesa payments are not configured".
+
+Sandbox credentials come from [developer.safaricom.co.ke](https://developer.safaricom.co.ke) (shortcode 174379 with its test passkey).
+
+---
+
+## Other Platform Features
+
+- **Profile-centric watch history.** Progress is stored per profile, so a title paused on one device resumes at the same second on another. Titles count as completed at 90 percent.
+- **Velocity-based trending.** `Score = 5 x views(1h) + 3 x views(6h) + 2 x completions(24h) + 1 x likes(24h)`.
+- **Entitlements and plan versioning.** Playback checks `max_concurrent_streams`, `max_registered_devices` and maximum resolution from the subscriber's plan version; editing a plan does not change existing subscribers' terms.
+- **Java 24 without Lombok.** Plain constructors, getters and setters, SLF4J logging, and an `ApiResponse` wrapper on every endpoint.
+
+---
+
+## Configuration
+
+Copy `backend/.env.example` to `backend/.env` (git-ignored) and fill it in. The main variables:
+
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `JWT_SECRET` | Yes | Signs access, profile and stream tokens. `openssl rand -hex 64` |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Yes | Admin account created or updated on startup (password at least 12 characters) |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD` | Yes | Must match the existing data volume |
+| `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | Yes | MinIO credentials, also used by media-service. `openssl rand -hex 24` |
+| `SETTINGS_ENCRYPTION_KEY` | Recommended | Encrypts M-Pesa credentials saved from the admin panel. `openssl rand -hex 32`. Falls back to a key derived from `JWT_SECRET` |
+| `MPESA_ENVIRONMENT`, `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_SHORTCODE`, `MPESA_PASSKEY`, `MPESA_TRANSACTION_TYPE` | Optional | Daraja credentials. The admin panel can set them instead |
+| `MPESA_CALLBACK_TOKEN` | With M-Pesa | Random secret in the callback URL. `openssl rand -hex 24` |
+| `MPESA_CALLBACK_BASE_URL` | Optional | Defaults to the production callback URL |
+| `MEDIA_PUBLIC_BASE_URL` | Optional | Public origin used in file URLs. Defaults to the production API host |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | Optional | Email delivery. Without SMTP, email sends are recorded as `FAILED` |
+| `MEDIA_MAX_VIDEO_BYTES`, `MEDIA_MAX_TRAILER_BYTES`, `MEDIA_MAX_IMAGE_BYTES` | Optional | Upload size limits (defaults 20 GiB, 2 GiB, 20 MiB) |
+| `MEDIA_TRANSCODE_THREADS`, `DB_POOL_SIZE`, `MEDIA_JAVA_OPTS` | Optional | Tuning for small hosts |
+
+Do not change `SETTINGS_ENCRYPTION_KEY` after credentials have been saved in the admin panel; they can no longer be decrypted and must be entered again.
+
+---
+
+## Local Development
+
+Prerequisites: JDK 24, Maven 3.9+, Node.js 20+, Flutter 3.38+, Docker with Compose.
+
 ```bash
+# Backend unit tests (all modules)
 cd backend
+mvn clean test
+
+# Full stack: PostgreSQL, Redis, MinIO, all services and the admin portal
+cp .env.example .env     # then fill in the required values
 docker compose up --build -d
 ```
 
+All ports are bound to `127.0.0.1` only:
+
+| Service | Host port |
+| :--- | :--- |
+| API gateway | `9080` |
+| Admin portal | `9090` |
+| MinIO console | `19001` |
+| PostgreSQL | `5434` |
+| Redis | `6380` |
+| Individual services | `18081` to `18093` |
+
 ---
 
-## Kubernetes Deployment Guide
+## Production Deployment
 
-The system includes production-ready Kubernetes manifests inside the `k8s/` directory.
+Production runs the Docker Compose stack on a single host (`kim`) behind nginx and Cloudflare (proxied). nginx forwards `streamxapi.briankimathi.dev` to the gateway on port 9080 and `streamxadmin.briankimathi.dev` to the admin portal on port 9090. The deployment lives in `~/deployments/streaming-system`, with secrets in `backend/.env` on the server only.
 
-### Manifest Directory Structure
-- `k8s/00-namespace.yaml`: Creates `streamx` namespace
-- `k8s/01-configmap-secrets.yaml`: System configurations and secrets
-- `k8s/02-postgres.yaml`: PostgreSQL Stateful Deployment & PersistentVolumeClaim
-- `k8s/03-redis.yaml`: Redis Deployment & Service
-- `k8s/04-kafka.yaml`: Apache Kafka Deployment & Service
-- `k8s/05-microservices.yaml`: Deployments & Services for all 14 StreamX microservices
-- `k8s/06-ingress.yaml`: NGINX Ingress Controller routing to `api-gateway`
-
-### Deploy to Kubernetes Cluster (Minikube / EKS / GKE / AKS)
 ```bash
-# Apply all Kubernetes manifests in order
-kubectl apply -f k8s/
+cd ~/deployments/streaming-system/backend
+docker compose up --build -d
+docker compose ps
+```
 
-# Monitor deployment rollout
+`.github/workflows/deploy.yml` does the same over SSH on every push to `main` when the `SSH_HOST`, `SSH_USER` and `SSH_PRIVATE_KEY` repository secrets are set. It runs `git pull`, so the server directory must be a git checkout for that workflow to work.
+
+**MinIO console.** The console is not exposed publicly. Open an SSH tunnel and browse to `http://localhost:19001` with the `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` credentials:
+
+```bash
+ssh -L 19001:127.0.0.1:19001 kim
+```
+
+MinIO runs the community-maintained `pgsty/minio` image, because the official `minio/minio` images are no longer published to Docker Hub or Quay.
+
+---
+
+## Known Limitations
+
+- **Transcoding speed.** On a 2 CPU host, transcoding runs at roughly real time (a 2 hour movie takes about 2 hours before it can be published). Uploading is not the bottleneck.
+- **Video links must be direct files.** Links to pages (YouTube, Google Drive viewers and similar) cannot be imported as videos. Trailer links to such pages are kept and open externally in the app.
+- **Trailer format.** Uploaded trailers are served as-is, so use MP4 (H.264/AAC) for playback on every device.
+- **No delete in the admin UI.** Movies and shows can be edited or unpublished from the portal. Delete endpoints exist (`DELETE /catalog/admin/movies/{id}`, `DELETE /catalog/admin/tv-shows/{id}`) but have no button yet.
+- **Mobile player testing.** The player has unit tests for its logic but has not yet been exercised on a physical device. iOS builds need a Mac.
+
+---
+
+## Kubernetes
+
+`backend/k8s/` contains manifests for a namespace, config and secrets, PostgreSQL, Redis, Kafka, the microservices and an NGINX ingress. They predate MinIO, the M-Pesa settings and the admin portal container, and still include Kafka, which the services no longer use. Docker Compose is the maintained deployment path; update the manifests before using them.
+
+```bash
+kubectl apply -f backend/k8s/
 kubectl get pods -n streamx --watch
-
-# Get LoadBalancer / Ingress endpoint
-kubectl get svc api-gateway -n streamx
 ```
 
 ---
 
-## CI/CD Pipeline (GitHub Actions)
+## CI/CD
 
-The repository includes an automated GitHub Actions workflow at `.github/workflows/ci-cd.yml`:
-1. **Build & Test**: Compiles all 16 Java microservices using JDK 24 and runs unit/integration tests on every `push` and `pull_request` to `main`.
-2. **Admin Web Validation**: Installs dependencies and runs `npm run build` for `apps/admin`.
-3. **Docker Build Strategy**: Builds container images for all microservices.
-4. **Kubernetes Validation**: Validates Kubernetes manifests for syntax correctness before deployment.
+- `.github/workflows/ci-cd.yml` builds and tests the Java modules with JDK 24, builds the admin portal, builds the container images and validates the Kubernetes manifests on pushes and pull requests to `main`.
+- `.github/workflows/deploy.yml` deploys to the production host over SSH (see Production Deployment).
 
 ---
 
 ## License
+
 Distributed under the MIT License.

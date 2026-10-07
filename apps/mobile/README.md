@@ -59,13 +59,20 @@ Identifiers: Android `applicationId` and iOS bundle id are `dev.briankimathi.str
   Pull to refresh. An empty catalog shows "No titles have been published yet".
 - **Search** — debounced search across movies and TV shows, genre chips, infinite scrolling.
 - **Title details** — backdrop, metadata, synopsis, Play/Resume, My List toggle (reflects the server
-  response), trailer (HLS/MP4 in-app, other https links externally), season picker and episode list with
-  per-episode progress.
-- **Player** — full-screen landscape HLS playback with wakelock, custom controls (play/pause, ±10 s,
-  scrubber with buffered range, elapsed/remaining), resume from saved position, heartbeat every 30 s,
-  progress every 15 s and on pause/background/exit, session stop on exit, 10-second "Next episode"
-  countdown when the profile has autoplay on. Playback errors route to the plans paywall (no
-  subscription), device re-registration (device signed out), or show the server message.
+  response), trailer (MP4/WebM/HLS in-app, other https links such as YouTube open externally), season
+  picker and episode list with per-episode progress.
+- **Player** — opens in full-screen landscape (either direction) with wakelock and returns to portrait on
+  exit. Controls: play/pause, ±10 s buttons, double-tap the left/right third to seek (taps accumulate:
+  -20 s, +30 s), scrubber with buffered range and elapsed/remaining time, playback speed (0.5x-1.5x),
+  screen lock, and for series an Episodes panel (season switcher, per-episode progress) and a Next
+  Episode button. A "Next Episode" pill appears in the last 20 s of an episode; at the end a card with
+  the next episode's thumbnail counts down 5 s when the profile has autoplay on. Movies end with
+  "Watch again" / "Back". Playback resumes from the saved position, sends a heartbeat every 30 s,
+  saves progress every 15 s and on pause/background/exit, and stops the session on exit. Errors route
+  to the plans paywall (no subscription), device re-registration (device signed out), or show the
+  server message.
+- **Artwork and trailers** — posters, backdrops and thumbnails can be uploaded files served by the media
+  service (`/api/v1/media/files/...`) or external links; trailers play in-app as progressive MP4.
 - **Maturity filtering** — titles above the profile's rating are hidden; unrated titles are hidden
   from Kids profiles (see `lib/core/utils/maturity.dart`).
 - **My List** — the profile's watchlist as a poster grid; long-press to remove.
@@ -85,8 +92,9 @@ Identifiers: Android `applicationId` and iOS bundle id are `dev.briankimathi.str
 4. **COMPLETED** — the subscription is reloaded and the M-Pesa receipt number is shown.
    **FAILED / CANCELLED** — the server's `errorMessage` is shown with *Try again*.
    No answer after 3 minutes — the app says so and offers *Check again*.
-5. If the backend has no M-Pesa credentials, checkout returns 503 and the app shows
-   "M-Pesa payments are not configured yet" as returned by the server.
+5. If no M-Pesa credentials are configured (admin panel: Payments (M-Pesa), or the backend `.env`),
+   checkout returns 503 and the app shows "M-Pesa payments are not configured yet" as returned by
+   the server.
 
 ## Structure
 

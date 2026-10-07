@@ -15,6 +15,6 @@ public record EpisodeRequest(
         @Size(max = 2000, message = "Synopsis is too long") String synopsis,
         @Positive(message = "Runtime must be positive") Integer runtimeMinutes,
         LocalDate releaseDate,
-        @Size(max = 255, message = "Thumbnail URL is too long") String thumbnailUrl
+        @MediaUrl String thumbnailUrl
 ) {
 }

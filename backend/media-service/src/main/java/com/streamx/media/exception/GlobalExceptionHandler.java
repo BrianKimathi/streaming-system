@@ -6,12 +6,23 @@ import com.streamx.common.exception.DomainException;
 import com.streamx.common.exception.ForbiddenException;
 import com.streamx.common.exception.ResourceNotFoundException;
 import com.streamx.common.exception.UnauthorizedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,51 +30,98 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiResponse<Object>> handleBadRequest(BadRequestException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Object>> handleUnauthorized(UnauthorizedException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(ex.getMessage()));
+        return error(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ApiResponse<Object>> handleForbidden(ForbiddenException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ex.getMessage()));
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleNotFound(ResourceNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getMessage()));
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConflict(ConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(ex.getMessage(), ex.getDetails()));
+    }
+
+    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, DataIntegrityViolationException.class})
+    public ResponseEntity<ApiResponse<Object>> handleConcurrentChange(Exception ex) {
+        return error(HttpStatus.CONFLICT, "The request conflicts with a concurrent change; reload and try again");
+    }
+
+    @ExceptionHandler(StorageUnavailableException.class)
+    public ResponseEntity<ApiResponse<Object>> handleStorageUnavailable(StorageUnavailableException ex) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Object>> handleDomainException(DomainException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMissingHeader(MissingRequestHeaderException ex) {
+        return error(HttpStatus.UNAUTHORIZED, "Authentication required");
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUnreadable(HttpMessageNotReadableException ex) {
+        return error(HttpStatus.BAD_REQUEST, "Malformed request body");
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return error(HttpStatus.BAD_REQUEST, "Invalid value for '" + ex.getName() + "'");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return error(HttpStatus.METHOD_NOT_ALLOWED, ex.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoResource(NoResourceFoundException ex) {
+        return error(HttpStatus.NOT_FOUND, "Not found");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
+            errors.put(fieldName, error.getDefaultMessage());
         });
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.error("Validation failed", errors));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Internal server error: " + ex.getMessage()));
+        log.error("Unhandled exception", ex);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+    }
+
+    // Image/video clients send Accept headers without JSON; a preset content type bypasses negotiation.
+    private static ResponseEntity<ApiResponse<Object>> error(HttpStatus status, String message) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiResponse.error(message));
     }
 }
