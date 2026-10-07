@@ -12,6 +12,7 @@ import { BillingPage } from './pages/BillingPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { TrendingPage } from './pages/TrendingPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 
 const MainLayout: React.FC = () => {
@@ -44,6 +45,8 @@ const MainLayout: React.FC = () => {
         return 'Velocity Score Intelligence';
       case 'notifications':
         return 'Notifications Audit & Dispatch Log';
+      case 'settings':
+        return 'System Settings & Platform Configuration';
       default:
         return 'Control Center';
     }
@@ -71,6 +74,8 @@ const MainLayout: React.FC = () => {
         return <TrendingPage />;
       case 'notifications':
         return <NotificationsPage />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return <DashboardPage />;
     }

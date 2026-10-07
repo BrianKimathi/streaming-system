@@ -12,6 +12,7 @@ import {
   LogOut,
   Tv,
   Tag,
+  Sliders,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
     { id: 'devices', label: 'Device Control', icon: Smartphone },
     { id: 'trending', label: 'Velocity Intelligence', icon: TrendingUp },
     { id: 'notifications', label: 'Notifications Log', icon: Bell },
+    { id: 'settings', label: 'System Settings', icon: Sliders },
   ];
 
   return (
