@@ -41,6 +41,7 @@
         <module>trending-service</module>
         <module>analytics-service</module>
         <module>notification-service</module>
+        <module>admin-service</module>
         <module>api-gateway</module>
     </modules>
 

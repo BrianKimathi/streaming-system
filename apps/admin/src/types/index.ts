@@ -41,16 +41,6 @@ export interface TVShow {
   status: ContentStatus;
 }
 
-export interface Episode {
-  id: string;
-  seasonId: string;
-  episodeNumber: number;
-  title: string;
-  description: string;
-  durationMinutes: number;
-  videoUrl?: string;
-}
-
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -61,14 +51,6 @@ export interface SubscriptionPlan {
   maxResolution: string; // HD, FHD, 4K
   offlineDownloadsAllowed: boolean;
   active: boolean;
-}
-
-export interface Entitlements {
-  maxConcurrentStreams: number;
-  maxRegisteredDevices: number;
-  maxResolution: string;
-  offlineDownloadsAllowed: boolean;
-  hdrSupported: boolean;
 }
 
 export interface PaymentTransaction {
@@ -145,6 +127,68 @@ export interface UserAccount {
   roles: string[];
   blocked: boolean;
   createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  administratorId?: string;
+  administratorEmail: string;
+  role: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  ipAddress?: string;
+  correlationId?: string;
+  details?: string;
+}
+
+export interface FeatureFlag {
+  id: string;
+  flagKey: string;
+  description: string;
+  enabled: boolean;
+  targetPercentage: number;
+  targetPlan?: string;
+  targetCountry?: string;
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'SEV1' | 'SEV2' | 'SEV3' | 'SEV4';
+  status: 'OPEN' | 'INVESTIGATING' | 'MITIGATED' | 'RESOLVED' | 'CLOSED';
+  affectedServices: string;
+  createdBy: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  accountId: string;
+  userEmail: string;
+  category: 'ACCOUNT' | 'BILLING' | 'SUBSCRIPTION' | 'PLAYBACK' | 'DEVICE';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  subject: string;
+  body: string;
+  assignedAgentEmail?: string;
+  createdAt: string;
+}
+
+export interface PromotionCoupon {
+  code: string;
+  discountPercentage: number;
+  trialDays: number;
+  usageLimit: number;
+  usedCount: number;
+  expiryDate: string;
+  eligiblePlan: string;
 }
 
 export interface AuthState {

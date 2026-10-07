@@ -12,6 +12,10 @@ import { BillingPage } from './pages/BillingPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { TrendingPage } from './pages/TrendingPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { SupportCenterPage } from './pages/SupportCenterPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
+import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
+import { OperationsHealthPage } from './pages/OperationsHealthPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 
@@ -45,6 +49,14 @@ const MainLayout: React.FC = () => {
         return 'Velocity Score Intelligence';
       case 'notifications':
         return 'Notifications Audit & Dispatch Log';
+      case 'support':
+        return 'Support Ticket Management & Context';
+      case 'audit-logs':
+        return 'System Audit Trail & Immutable Logs';
+      case 'flags':
+        return 'Feature Flag Rollouts & AB Testing';
+      case 'ops-health':
+        return 'Platform Operations & Infrastructure Health';
       case 'settings':
         return 'System Settings & Platform Configuration';
       default:
@@ -74,6 +86,14 @@ const MainLayout: React.FC = () => {
         return <TrendingPage />;
       case 'notifications':
         return <NotificationsPage />;
+      case 'support':
+        return <SupportCenterPage />;
+      case 'audit-logs':
+        return <AuditLogsPage />;
+      case 'flags':
+        return <FeatureFlagsPage />;
+      case 'ops-health':
+        return <OperationsHealthPage />;
       case 'settings':
         return <SettingsPage />;
       default:

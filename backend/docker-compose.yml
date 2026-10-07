@@ -183,6 +183,17 @@ services:
       postgres:
         condition: service_healthy
 
+  admin-service:
+    build: ./admin-service
+    container_name: streamx-admin-service
+    ports:
+      - "8093:8093"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/admin_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api-gateway:
     build: ./api-gateway
     container_name: streamx-api-gateway
@@ -201,6 +212,7 @@ services:
       TRENDING_SERVICE_URL: http://trending-service:8090
       ANALYTICS_SERVICE_URL: http://analytics-service:8091
       NOTIFICATION_SERVICE_URL: http://notification-service:8092
+      ADMIN_SERVICE_URL: http://admin-service:8093
     depends_on:
       - auth-service
       - user-service

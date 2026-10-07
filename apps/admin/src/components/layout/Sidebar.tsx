@@ -13,6 +13,10 @@ import {
   Tv,
   Tag,
   Sliders,
+  LifeBuoy,
+  ShieldAlert,
+  Flag,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -34,6 +38,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
     { id: 'billing', label: 'Billing & Refunds', icon: DollarSign },
     { id: 'devices', label: 'Device Control', icon: Smartphone },
     { id: 'trending', label: 'Velocity Intelligence', icon: TrendingUp },
+    { id: 'support', label: 'Support Ticket Center', icon: LifeBuoy },
+    { id: 'audit-logs', label: 'Audit Trail & Logs', icon: ShieldAlert },
+    { id: 'flags', label: 'Feature Flags & A/B', icon: Flag },
+    { id: 'ops-health', label: 'Ops Health & Cluster', icon: Activity },
     { id: 'notifications', label: 'Notifications Log', icon: Bell },
     { id: 'settings', label: 'System Settings', icon: Sliders },
   ];

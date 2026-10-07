@@ -12,6 +12,11 @@ import {
   AnalyticsDashboard,
   NotificationLog,
   UserAccount,
+  AuditLog,
+  FeatureFlag,
+  Incident,
+  SupportTicket,
+  PromotionCoupon,
 } from '../types';
 
 export const adminService = {
@@ -33,6 +38,69 @@ export const adminService = {
     const res = await api.patch<ApiResponse<UserAccount>>(`/auth/accounts/${accountId}/status`, {
       blocked: isBlocked,
     });
+    return res.data;
+  },
+
+  // --- Audit Logs ---
+  getAuditLogs: async () => {
+    const res = await api.get<ApiResponse<AuditLog[]>>('/admin/audit-logs');
+    return res.data;
+  },
+
+  recordAuditLog: async (logEntry: Partial<AuditLog>) => {
+    const res = await api.post<ApiResponse<AuditLog>>('/admin/audit-logs', logEntry);
+    return res.data;
+  },
+
+  // --- Feature Flags ---
+  getFeatureFlags: async () => {
+    const res = await api.get<ApiResponse<FeatureFlag[]>>('/admin/feature-flags');
+    return res.data;
+  },
+
+  toggleFeatureFlag: async (flagKey: string, enabled: boolean, targetPercentage: number, reason: string) => {
+    const res = await api.post<ApiResponse<FeatureFlag>>('/admin/feature-flags/toggle', null, {
+      params: { flagKey, enabled, targetPercentage, reason },
+    });
+    return res.data;
+  },
+
+  // --- Incidents ---
+  getIncidents: async () => {
+    const res = await api.get<ApiResponse<Incident[]>>('/admin/incidents');
+    return res.data;
+  },
+
+  createIncident: async (title: string, description: string, severity: string, affectedServices: string) => {
+    const res = await api.post<ApiResponse<Incident>>('/admin/incidents', null, {
+      params: { title, description, severity, affectedServices },
+    });
+    return res.data;
+  },
+
+  // --- Support Tickets ---
+  getSupportTickets: async () => {
+    const res = await api.get<ApiResponse<SupportTicket[]>>('/admin/tickets');
+    return res.data;
+  },
+
+  createSupportTicket: async (ticket: Partial<SupportTicket>) => {
+    const res = await api.post<ApiResponse<SupportTicket>>('/admin/tickets', null, {
+      params: {
+        accountId: ticket.accountId,
+        userEmail: ticket.userEmail,
+        category: ticket.category,
+        priority: ticket.priority,
+        subject: ticket.subject,
+        body: ticket.body,
+      },
+    });
+    return res.data;
+  },
+
+  // --- System Health ---
+  getSystemHealth: async () => {
+    const res = await api.get<ApiResponse<Record<string, any>>>('/admin/system/health');
     return res.data;
   },
 
