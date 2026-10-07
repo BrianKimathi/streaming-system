@@ -246,5 +246,13 @@ services:
       - user-service
       - catalog-service
 
+  admin-web:
+    build:
+      context: ../apps/admin
+      dockerfile: Dockerfile
+    container_name: streamx-admin-web
+    ports:
+      - "${ADMIN_WEB_PORT:-9090}:80"
+
 volumes:
   postgres_data:
