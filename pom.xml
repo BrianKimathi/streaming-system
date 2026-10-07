@@ -32,6 +32,9 @@
         <module>auth-service</module>
         <module>user-service</module>
         <module>catalog-service</module>
+        <module>subscription-service</module>
+        <module>billing-service</module>
+        <module>device-service</module>
         <module>api-gateway</module>
     </modules>
 

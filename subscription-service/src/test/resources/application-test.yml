@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:subscription_test_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+jwt:
+  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  access-token-expiration-ms: 900000
+  refresh-token-expiration-ms: 604800000

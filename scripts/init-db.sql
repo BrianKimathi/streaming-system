@@ -1,3 +1,6 @@
 CREATE DATABASE auth_db;
 CREATE DATABASE user_db;
 CREATE DATABASE catalog_db;
+CREATE DATABASE subscription_db;
+CREATE DATABASE billing_db;
+CREATE DATABASE device_db;

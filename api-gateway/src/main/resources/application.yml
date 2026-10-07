@@ -22,6 +22,21 @@ spring:
           predicates:
             - Path=/api/v1/catalog/**
 
+        - id: subscription-service
+          uri: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/subscriptions/**
+
+        - id: billing-service
+          uri: ${BILLING_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/billing/**
+
+        - id: device-service
+          uri: ${DEVICE_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/devices/**
+
 jwt:
   secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
   access-token-expiration-ms: 900000
