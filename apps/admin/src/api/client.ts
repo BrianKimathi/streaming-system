@@ -1,7 +1,8 @@
 import axios from 'axios';
 
+const metaEnv = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
 const api = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_URL || 'https://streamxapi.briankimathi.dev/api/v1',
+  baseURL: metaEnv?.VITE_API_URL || 'https://streamxapi.briankimathi.dev/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
