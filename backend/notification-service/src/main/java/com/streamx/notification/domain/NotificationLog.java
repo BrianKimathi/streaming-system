@@ -31,10 +31,28 @@ public class NotificationLog {
     private String body;
 
     @Column(name = "status", nullable = false)
-    private String status; // SENT, FAILED, PENDING
+    private String status; // SENT, DELIVERED, FAILED
+
+    @Column(name = "failure_reason", length = 1000)
+    private String failureReason;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
 
     public NotificationLog() {
     }

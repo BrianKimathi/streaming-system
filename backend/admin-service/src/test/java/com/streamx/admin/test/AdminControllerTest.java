@@ -3,6 +3,7 @@ package com.streamx.admin.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.streamx.admin.domain.AuditLog;
 import com.streamx.admin.service.AdminService;
+import com.streamx.admin.service.SystemHealthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +28,9 @@ class AdminControllerTest {
 
     @MockitoBean
     private AdminService adminService;
+
+    @MockitoBean
+    private SystemHealthService systemHealthService;
 
     @Test
     void getAuditLogs_Returns200() throws Exception {

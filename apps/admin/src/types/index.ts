@@ -2,193 +2,28 @@ export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
-  errors?: any;
+  errors?: unknown;
   timestamp?: string;
 }
 
-export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-
-export interface Genre {
-  id: string;
-  name: string;
-  description?: string;
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
 }
 
-export interface Movie {
-  id: string;
-  title: string;
-  description: string;
-  releaseYear: number;
-  durationMinutes: number;
-  maturityRating: string;
-  genres: Genre[];
-  posterUrl: string;
-  bannerUrl: string;
-  status: ContentStatus;
-  createdAt: string;
-}
-
-export interface TVShow {
-  id: string;
-  title: string;
-  description: string;
-  releaseYear: number;
-  maturityRating: string;
-  genres: Genre[];
-  posterUrl: string;
-  bannerUrl: string;
-  seasonsCount: number;
-  status: ContentStatus;
-}
-
-export interface SubscriptionPlan {
-  id: string;
-  name: string;
-  version: number;
-  monthlyPrice: number;
-  maxConcurrentStreams: number;
-  maxRegisteredDevices: number;
-  maxResolution: string; // HD, FHD, 4K
-  offlineDownloadsAllowed: boolean;
-  active: boolean;
-}
-
-export interface PaymentTransaction {
-  transactionId: string;
+// --- Auth ---
+export interface AuthResponse {
   accountId: string;
-  amount: number;
-  currency: string;
-  status: 'SUCCESS' | 'FAILED' | 'REFUNDED' | 'PENDING';
-  paymentMethod: string;
-  createdAt: string;
-}
-
-export interface DeviceRegistration {
-  id: string;
-  accountId: string;
-  deviceFingerprint: string;
-  deviceName: string;
-  deviceType: 'MOBILE' | 'DESKTOP' | 'SMART_TV' | 'TABLET';
-  status: 'ACTIVE' | 'REVOKED';
-  registeredAt: string;
-  lastActiveAt: string;
-}
-
-export interface MediaAsset {
-  id: string;
-  contentId: string;
-  filename: string;
-  masterPlaylistUrl: string;
-  transcodingStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  durationSeconds: number;
-  fileSizeBytes: number;
-  uploadedAt: string;
-}
-
-export interface TrendingItem {
-  contentId: string;
-  title: string;
-  contentType: 'MOVIE' | 'TV_SHOW' | 'EPISODE';
-  views1h: number;
-  views6h: number;
-  completions24h: number;
-  likes24h: number;
-  velocityScore: number;
-  updatedAt: string;
-}
-
-export interface AnalyticsDashboard {
-  date: string;
-  dailyActiveUsers: number;
-  monthlyActiveUsers: number;
-  totalWatchTimeHours: number;
-  averageCompletionRatePercentage: number;
-  totalStreamsStarted: number;
-  totalSubscriptionsActive: number;
-  totalRevenue: number;
-}
-
-export interface NotificationLog {
-  id: string;
-  accountId: string;
-  recipient: string;
-  channel: 'EMAIL' | 'SMS' | 'IN_APP';
-  template: 'WELCOME' | 'OTP' | 'PAYMENT_SUCCESS' | 'PAYMENT_FAILED';
-  subject: string;
-  body: string;
-  status: 'SENT' | 'FAILED' | 'PENDING';
-  createdAt: string;
-}
-
-export interface UserAccount {
-  id: string;
   email: string;
   phoneNumber?: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
   roles: string[];
-  blocked: boolean;
-  createdAt: string;
-}
-
-export interface AuditLog {
-  id: string;
-  timestamp: string;
-  administratorId?: string;
-  administratorEmail: string;
-  role: string;
-  action: string;
-  targetType: string;
-  targetId: string;
-  reason: string;
-  ipAddress?: string;
-  correlationId?: string;
-  details?: string;
-}
-
-export interface FeatureFlag {
-  id: string;
-  flagKey: string;
-  description: string;
-  enabled: boolean;
-  targetPercentage: number;
-  targetPlan?: string;
-  targetCountry?: string;
-  lastModifiedBy?: string;
-  lastModifiedAt?: string;
-}
-
-export interface Incident {
-  id: string;
-  title: string;
-  description: string;
-  severity: 'SEV1' | 'SEV2' | 'SEV3' | 'SEV4';
-  status: 'OPEN' | 'INVESTIGATING' | 'MITIGATED' | 'RESOLVED' | 'CLOSED';
-  affectedServices: string;
-  createdBy: string;
-  createdAt: string;
-  resolvedAt?: string;
-}
-
-export interface SupportTicket {
-  id: string;
-  accountId: string;
-  userEmail: string;
-  category: 'ACCOUNT' | 'BILLING' | 'SUBSCRIPTION' | 'PLAYBACK' | 'DEVICE';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
-  subject: string;
-  body: string;
-  assignedAgentEmail?: string;
-  createdAt: string;
-}
-
-export interface PromotionCoupon {
-  code: string;
-  discountPercentage: number;
-  trialDays: number;
-  usageLimit: number;
-  usedCount: number;
-  expiryDate: string;
-  eligiblePlan: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface AuthState {
@@ -197,4 +32,515 @@ export interface AuthState {
   email: string | null;
   roles: string[];
   isAuthenticated: boolean;
+}
+
+export interface UserAccount {
+  id: string;
+  email: string | null;
+  phoneNumber: string | null;
+  roles: string[];
+  status: 'ACTIVE' | 'SUSPENDED' | 'DELETED' | string;
+  blocked: boolean;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  createdAt: string;
+}
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface DailyAmount {
+  date: string;
+  amount: number;
+}
+
+export interface AccountStats {
+  totalAccounts: number;
+  activeAccounts: number;
+  suspendedAccounts: number;
+  newAccountsToday: number;
+  newAccountsLast7Days: number;
+  newAccountsLast30Days: number;
+  dailySignups: DailyCount[];
+}
+
+// --- Catalog ---
+export type ContentStatus =
+  | 'DRAFT'
+  | 'PROCESSING'
+  | 'READY'
+  | 'SCHEDULED'
+  | 'PUBLISHED'
+  | 'EXPIRING'
+  | 'EXPIRED'
+  | 'ARCHIVED';
+
+export const CONTENT_STATUSES: ContentStatus[] = [
+  'DRAFT',
+  'PROCESSING',
+  'READY',
+  'SCHEDULED',
+  'PUBLISHED',
+  'EXPIRING',
+  'EXPIRED',
+  'ARCHIVED',
+];
+
+export interface Genre {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Movie {
+  id: string;
+  title: string;
+  synopsis: string | null;
+  releaseDate: string | null;
+  runtimeMinutes: number | null;
+  maturityRating: string | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  trailerUrl: string | null;
+  mediaAssetUrl: string | null;
+  status: ContentStatus;
+  genres: Genre[];
+  createdAt: string | null;
+}
+
+export interface CreateMovieRequest {
+  title: string;
+  synopsis?: string;
+  releaseDate?: string;
+  runtimeMinutes?: number;
+  maturityRating?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  trailerUrl?: string;
+  status?: ContentStatus;
+  genreIds?: string[];
+}
+
+export interface TVShow {
+  id: string;
+  title: string;
+  synopsis: string | null;
+  releaseDate: string | null;
+  maturityRating: string | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  trailerUrl: string | null;
+  status: ContentStatus;
+  genres: Genre[];
+  seasonsCount: number;
+  createdAt: string | null;
+}
+
+export interface CreateTvShowRequest {
+  title: string;
+  synopsis?: string;
+  releaseDate?: string;
+  maturityRating?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  trailerUrl?: string;
+  status?: ContentStatus;
+  genreIds?: string[];
+  seasonsCount?: number;
+}
+
+export interface Episode {
+  id: string;
+  seasonId: string;
+  tvShowId: string;
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  synopsis: string | null;
+  runtimeMinutes: number | null;
+  releaseDate: string | null;
+  thumbnailUrl: string | null;
+}
+
+export interface Season {
+  id: string;
+  tvShowId: string;
+  seasonNumber: number;
+  title: string | null;
+  synopsis: string | null;
+  releaseDate: string | null;
+  posterUrl: string | null;
+  episodes: Episode[] | null;
+}
+
+export interface TvShowDetail extends TVShow {
+  seasons: Season[] | null;
+}
+
+/** Body for POST /catalog/admin/tv-shows/{showId}/seasons and PUT /catalog/admin/seasons/{id}. */
+export interface SeasonRequest {
+  seasonNumber: number;
+  title?: string | null;
+  synopsis?: string | null;
+  releaseDate?: string | null;
+  posterUrl?: string | null;
+}
+
+/** Body for POST /catalog/admin/seasons/{seasonId}/episodes and PUT /catalog/admin/episodes/{id}. */
+export interface EpisodeRequest {
+  episodeNumber: number;
+  title: string;
+  synopsis?: string | null;
+  runtimeMinutes?: number | null;
+  releaseDate?: string | null;
+  thumbnailUrl?: string | null;
+}
+
+/** GET /catalog/lookup — only PUBLISHED titles (and episodes of PUBLISHED shows) are returned. */
+export interface CatalogLookup {
+  movies: Movie[];
+  tvShows: TVShow[];
+  episodes: Episode[];
+}
+
+export interface CatalogStats {
+  totalMovies: number;
+  publishedMovies: number;
+  totalTvShows: number;
+  publishedTvShows: number;
+  totalGenres: number;
+  moviesByStatus: Record<string, number>;
+  tvShowsByStatus: Record<string, number>;
+}
+
+// --- Subscriptions ---
+export type BillingInterval = 'MONTHLY' | 'YEARLY';
+export type VideoResolution = 'SD_720P' | 'FHD_1080P' | 'UHD_4K';
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  billingInterval: BillingInterval;
+  version: number;
+  active: boolean;
+  maxProfiles: number;
+  maxRegisteredDevices: number;
+  maxConcurrentStreams: number;
+  maxResolution: VideoResolution;
+  hdrEnabled: boolean;
+  audioQuality: string;
+  downloadsEnabled: boolean;
+  maxDownloadDevices: number;
+  kidsProfilesEnabled: boolean;
+}
+
+export type CreatePlanRequest = Omit<SubscriptionPlan, 'id' | 'version' | 'active'>;
+
+export interface Entitlements {
+  subscriptionId: string;
+  status: string;
+  maxProfiles: number;
+  maxRegisteredDevices: number;
+  maxConcurrentStreams: number;
+  maxResolution: VideoResolution;
+  hdrEnabled: boolean;
+  audioQuality: string;
+  downloadsEnabled: boolean;
+  maxDownloadDevices: number;
+  kidsProfilesEnabled: boolean;
+}
+
+export interface Subscription {
+  id: string;
+  accountId: string;
+  plan: SubscriptionPlan;
+  status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'GRACE_PERIOD' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  entitlements: Entitlements;
+}
+
+export interface SubscriptionStats {
+  totalSubscriptions: number;
+  activeSubscriptions: number;
+  newLast30Days: number;
+  countByStatus: Record<string, number>;
+  activeByPlan: {
+    planId: string;
+    planName: string;
+    planVersion: number | null;
+    price: number | null;
+    currency: string | null;
+    activeSubscriptions: number;
+  }[];
+  monthlyRecurringRevenueByCurrency: Record<string, number>;
+  activePlans: number;
+}
+
+// --- Billing ---
+export type PaymentStatus = 'INITIATED' | 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+
+export const PAYMENT_STATUSES: PaymentStatus[] = ['INITIATED', 'PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELLED'];
+
+export interface PaymentTransaction {
+  id: string;
+  accountId: string;
+  subscriptionId: string | null;
+  planId: string | null;
+  planName: string | null;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  /** "MPESA" for all new transactions; older records may carry other values. */
+  paymentMethod: 'MPESA' | string | null;
+  /** Full MSISDN on admin endpoints (e.g. 254712345678). */
+  phoneNumber: string | null;
+  /** M-Pesa receipt number (MpesaReceiptNumber) once the payment is confirmed. */
+  externalTransactionId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface BillingStats {
+  totalTransactions: number;
+  completedTransactions: number;
+  failedTransactions: number;
+  refundedTransactions: number;
+  payingAccounts: number;
+  revenueByCurrency: Record<string, number>;
+  refundedByCurrency: Record<string, number>;
+  totalRevenue: number;
+  revenueLast30Days: number;
+  primaryCurrency: string;
+  countByStatus: Record<string, number>;
+  dailyRevenue: DailyAmount[];
+}
+
+// --- Devices ---
+export interface DeviceRegistration {
+  id: string;
+  accountId: string;
+  deviceFingerprint: string;
+  deviceName: string | null;
+  deviceType: 'TV' | 'PHONE' | 'TABLET' | 'LAPTOP' | 'CONSOLE' | string;
+  platform: string | null;
+  appVersion: string | null;
+  status: 'ACTIVE' | 'REVOKED';
+  registeredAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface DeviceStats {
+  totalDevices: number;
+  activeDevices: number;
+  revokedDevices: number;
+  activeDevicesByType: Record<string, number>;
+}
+
+// --- Media ---
+export type MediaProcessingStatus = 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface MediaAsset {
+  id: string;
+  contentId: string;
+  originalFilename: string | null;
+  masterPlaylistUrl: string | null;
+  status: MediaProcessingStatus;
+  durationSeconds: number | null;
+  fileSizeBytes: number | null;
+  failureReason: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface MediaStats {
+  totalAssets: number;
+  countByStatus: Record<string, number>;
+  totalReadyDurationSeconds: number;
+  totalSourceBytes: number;
+}
+
+// --- Trending ---
+export interface TrendingItem {
+  contentId: string;
+  title: string;
+  contentType: string;
+  views1h: number;
+  views6h: number;
+  completions24h: number;
+  likes24h: number;
+  velocityScore: number;
+  updatedAt: string;
+}
+
+// --- Playback / Watch history ---
+export interface PlaybackStats {
+  activeStreams: number;
+  totalSessions: number;
+  sessionsToday: number;
+  dailyActiveAccounts: number;
+  weeklyActiveAccounts: number;
+  monthlyActiveAccounts: number;
+  dailySessions: DailyCount[];
+  topContentLast7Days: { contentId: string; sessions: number }[];
+}
+
+export interface WatchHistoryStats {
+  totalProgressRecords: number;
+  completedViews: number;
+  completionRate: number;
+  averageProgressPercent: number;
+  totalWatchSeconds: number;
+  watchSecondsLast7Days: number;
+  activeViewersLast7Days: number;
+  activityLast24Hours: number;
+  topContent: { contentId: string; viewers: number; completions: number }[];
+}
+
+// --- Notifications ---
+export type NotificationChannel = 'EMAIL' | 'SMS' | 'IN_APP';
+
+export interface NotificationLog {
+  id: string;
+  accountId: string;
+  recipient: string;
+  channel: NotificationChannel | string;
+  template: string;
+  subject: string | null;
+  body: string | null;
+  status: 'SENT' | 'DELIVERED' | 'FAILED' | 'PENDING' | string;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface NotificationStats {
+  total: number;
+  last24Hours: number;
+  countByStatus: Record<string, number>;
+  countByChannel: Record<string, number>;
+}
+
+export interface SendNotificationRequest {
+  accountId: string;
+  recipient: string;
+  channel: NotificationChannel;
+  template?: string;
+  subject?: string;
+  body: string;
+}
+
+// --- Analytics overview ---
+export interface DashboardSection<T> {
+  available: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface PlatformDashboard {
+  generatedAt: string;
+  sections: {
+    users: DashboardSection<AccountStats>;
+    catalog: DashboardSection<CatalogStats>;
+    subscriptions: DashboardSection<SubscriptionStats>;
+    billing: DashboardSection<BillingStats>;
+    devices: DashboardSection<DeviceStats>;
+    media: DashboardSection<MediaStats>;
+    playback: DashboardSection<PlaybackStats>;
+    watchHistory: DashboardSection<WatchHistoryStats>;
+    notifications: DashboardSection<NotificationStats>;
+  };
+}
+
+// --- Admin control plane ---
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  administratorId?: string;
+  administratorEmail: string;
+  role: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  reason: string | null;
+  ipAddress?: string | null;
+  correlationId?: string | null;
+  details?: string | null;
+}
+
+export interface AuditEntry {
+  action: string;
+  targetType: string;
+  targetId?: string;
+  reason?: string;
+  details?: string;
+}
+
+export interface FeatureFlag {
+  id: string;
+  flagKey: string;
+  description: string | null;
+  enabled: boolean;
+  targetPercentage: number;
+  targetPlan?: string | null;
+  targetCountry?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedAt?: string | null;
+}
+
+export type IncidentSeverity = 'SEV1' | 'SEV2' | 'SEV3' | 'SEV4';
+export type IncidentStatus = 'OPEN' | 'INVESTIGATING' | 'MITIGATED' | 'RESOLVED' | 'CLOSED';
+
+export interface Incident {
+  id: string;
+  title: string;
+  description: string | null;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  affectedServices: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
+
+export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface SupportTicket {
+  id: string;
+  accountId: string | null;
+  userEmail: string | null;
+  category: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  subject: string;
+  body: string | null;
+  assignedAgentEmail?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComponentHealth {
+  name: string;
+  status: 'UP' | 'DOWN';
+  latencyMs?: number;
+  httpStatus?: number;
+  error?: string;
+  connections?: number;
+  maxConnections?: number;
+  version?: string;
+}
+
+export interface SystemHealth {
+  status: 'UP' | 'DEGRADED';
+  componentsDown: number;
+  checkedAt: string;
+  services: ComponentHealth[];
+  infrastructure: ComponentHealth[];
 }

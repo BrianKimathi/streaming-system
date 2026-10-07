@@ -13,8 +13,17 @@ public class NotificationResponseDto {
     private String body;
     private String status;
     private Instant createdAt;
+    private String failureReason;
 
     public NotificationResponseDto() {
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
     }
 
     public NotificationResponseDto(UUID id, UUID accountId, String recipient, String channel,

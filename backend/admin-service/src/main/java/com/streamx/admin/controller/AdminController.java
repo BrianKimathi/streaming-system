@@ -1,9 +1,12 @@
 package com.streamx.admin.controller;
 
 import com.streamx.admin.domain.*;
+import com.streamx.admin.security.AdminIdentity;
 import com.streamx.admin.service.AdminService;
+import com.streamx.admin.service.SystemHealthService;
 import com.streamx.common.dto.ApiResponse;
 import com.streamx.common.events.AuditLogEvent;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,83 +19,111 @@ import java.util.UUID;
 public class AdminController {
 
     private final AdminService adminService;
+    private final SystemHealthService systemHealthService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, SystemHealthService systemHealthService) {
         this.adminService = adminService;
+        this.systemHealthService = systemHealthService;
     }
 
     // --- Audit Logs ---
     @GetMapping("/audit-logs")
     public ResponseEntity<ApiResponse<List<AuditLog>>> getAuditLogs() {
-        List<AuditLog> logs = adminService.getAuditLogs();
-        return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved successfully", logs));
+        return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved successfully", adminService.getAuditLogs()));
     }
 
     @PostMapping("/audit-logs")
-    public ResponseEntity<ApiResponse<AuditLog>> recordAuditLog(@RequestBody AuditLogEvent event) {
-        AuditLog log = adminService.recordAuditLog(event);
+    public ResponseEntity<ApiResponse<AuditLog>> recordAuditLog(HttpServletRequest request, @RequestBody AuditLogEvent event) {
+        AuditLog log = adminService.recordAuditLog(AdminIdentity.from(request), event);
         return ResponseEntity.ok(ApiResponse.success("Audit log recorded successfully", log));
     }
 
     // --- Feature Flags ---
     @GetMapping("/feature-flags")
     public ResponseEntity<ApiResponse<List<FeatureFlag>>> getFeatureFlags() {
-        List<FeatureFlag> flags = adminService.getFeatureFlags();
-        return ResponseEntity.ok(ApiResponse.success("Feature flags retrieved successfully", flags));
+        return ResponseEntity.ok(ApiResponse.success("Feature flags retrieved successfully", adminService.getFeatureFlags()));
+    }
+
+    @PostMapping("/feature-flags")
+    public ResponseEntity<ApiResponse<FeatureFlag>> createFeatureFlag(
+            HttpServletRequest request,
+            @RequestParam String flagKey,
+            @RequestParam(required = false) String description,
+            @RequestParam(defaultValue = "false") boolean enabled,
+            @RequestParam(defaultValue = "0") int targetPercentage) {
+        FeatureFlag flag = adminService.createFeatureFlag(AdminIdentity.from(request), flagKey, description, enabled, targetPercentage);
+        return ResponseEntity.ok(ApiResponse.success("Feature flag created", flag));
     }
 
     @PostMapping("/feature-flags/toggle")
     public ResponseEntity<ApiResponse<FeatureFlag>> toggleFeatureFlag(
+            HttpServletRequest request,
             @RequestParam String flagKey,
             @RequestParam boolean enabled,
             @RequestParam(defaultValue = "100") int targetPercentage,
-            @RequestParam(defaultValue = "admin@streamx.io") String adminEmail,
-            @RequestParam(defaultValue = "Administrative update") String reason) {
-        FeatureFlag flag = adminService.toggleFeatureFlag(flagKey, enabled, targetPercentage, adminEmail, reason);
+            @RequestParam(required = false) String reason) {
+        FeatureFlag flag = adminService.toggleFeatureFlag(AdminIdentity.from(request), flagKey, enabled, targetPercentage, reason);
         return ResponseEntity.ok(ApiResponse.success("Feature flag updated successfully", flag));
     }
 
     // --- Incidents ---
     @GetMapping("/incidents")
     public ResponseEntity<ApiResponse<List<Incident>>> getIncidents() {
-        List<Incident> incidents = adminService.getIncidents();
-        return ResponseEntity.ok(ApiResponse.success("Platform incidents retrieved successfully", incidents));
+        return ResponseEntity.ok(ApiResponse.success("Platform incidents retrieved successfully", adminService.getIncidents()));
     }
 
     @PostMapping("/incidents")
     public ResponseEntity<ApiResponse<Incident>> createIncident(
+            HttpServletRequest request,
             @RequestParam String title,
-            @RequestParam String description,
-            @RequestParam(defaultValue = "SEV2") String severity,
-            @RequestParam(defaultValue = "All Services") String affectedServices,
-            @RequestParam(defaultValue = "admin@streamx.io") String createdBy) {
-        Incident incident = adminService.createIncident(title, description, severity, affectedServices, createdBy);
+            @RequestParam(required = false) String description,
+            @RequestParam(defaultValue = "SEV3") String severity,
+            @RequestParam(required = false) String affectedServices) {
+        Incident incident = adminService.createIncident(AdminIdentity.from(request), title, description, severity, affectedServices);
         return ResponseEntity.ok(ApiResponse.success("Incident created successfully", incident));
+    }
+
+    @PatchMapping("/incidents/{id}/status")
+    public ResponseEntity<ApiResponse<Incident>> updateIncidentStatus(
+            HttpServletRequest request,
+            @PathVariable("id") UUID id,
+            @RequestParam String status) {
+        Incident incident = adminService.updateIncidentStatus(AdminIdentity.from(request), id, status);
+        return ResponseEntity.ok(ApiResponse.success("Incident updated", incident));
     }
 
     // --- Support Tickets ---
     @GetMapping("/tickets")
     public ResponseEntity<ApiResponse<List<SupportTicket>>> getSupportTickets() {
-        List<SupportTicket> tickets = adminService.getSupportTickets();
-        return ResponseEntity.ok(ApiResponse.success("Support tickets retrieved successfully", tickets));
+        return ResponseEntity.ok(ApiResponse.success("Support tickets retrieved successfully", adminService.getSupportTickets()));
     }
 
     @PostMapping("/tickets")
     public ResponseEntity<ApiResponse<SupportTicket>> createSupportTicket(
-            @RequestParam UUID accountId,
-            @RequestParam String userEmail,
-            @RequestParam String category,
-            @RequestParam String priority,
+            HttpServletRequest request,
+            @RequestParam(required = false) UUID accountId,
+            @RequestParam(required = false) String userEmail,
+            @RequestParam(defaultValue = "ACCOUNT") String category,
+            @RequestParam(defaultValue = "MEDIUM") String priority,
             @RequestParam String subject,
-            @RequestParam String body) {
-        SupportTicket ticket = adminService.createSupportTicket(accountId, userEmail, category, priority, subject, body);
+            @RequestParam(required = false) String body) {
+        SupportTicket ticket = adminService.createSupportTicket(AdminIdentity.from(request), accountId, userEmail, category, priority, subject, body);
         return ResponseEntity.ok(ApiResponse.success("Support ticket created successfully", ticket));
+    }
+
+    @PatchMapping("/tickets/{id}")
+    public ResponseEntity<ApiResponse<SupportTicket>> updateSupportTicket(
+            HttpServletRequest request,
+            @PathVariable("id") UUID id,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String assignedAgentEmail) {
+        SupportTicket ticket = adminService.updateSupportTicket(AdminIdentity.from(request), id, status, assignedAgentEmail);
+        return ResponseEntity.ok(ApiResponse.success("Support ticket updated", ticket));
     }
 
     // --- System Health ---
     @GetMapping("/system/health")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getSystemHealth() {
-        Map<String, Object> health = adminService.getSystemHealth();
-        return ResponseEntity.ok(ApiResponse.success("System health operational status", health));
+        return ResponseEntity.ok(ApiResponse.success("System health", systemHealthService.getSystemHealth()));
     }
 }

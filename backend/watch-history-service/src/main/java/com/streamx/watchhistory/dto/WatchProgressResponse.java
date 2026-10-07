@@ -1,12 +1,15 @@
 package com.streamx.watchhistory.dto;
 
+import com.streamx.watchhistory.domain.TitleType;
+
 import java.time.LocalDateTime;
 
 public class WatchProgressResponse {
     private String id;
     private String profileId;
     private String contentId;
-    private String episodeId;
+    private String titleId;
+    private TitleType titleType;
     private long positionSeconds;
     private long durationSeconds;
     private double percentage;
@@ -16,13 +19,14 @@ public class WatchProgressResponse {
     public WatchProgressResponse() {
     }
 
-    public WatchProgressResponse(String id, String profileId, String contentId, String episodeId,
+    public WatchProgressResponse(String id, String profileId, String contentId, String titleId, TitleType titleType,
                                  long positionSeconds, long durationSeconds, double percentage,
                                  boolean completed, LocalDateTime lastWatchedAt) {
         this.id = id;
         this.profileId = profileId;
         this.contentId = contentId;
-        this.episodeId = episodeId;
+        this.titleId = titleId;
+        this.titleType = titleType;
         this.positionSeconds = positionSeconds;
         this.durationSeconds = durationSeconds;
         this.percentage = percentage;
@@ -54,12 +58,20 @@ public class WatchProgressResponse {
         this.contentId = contentId;
     }
 
-    public String getEpisodeId() {
-        return episodeId;
+    public String getTitleId() {
+        return titleId;
     }
 
-    public void setEpisodeId(String episodeId) {
-        this.episodeId = episodeId;
+    public void setTitleId(String titleId) {
+        this.titleId = titleId;
+    }
+
+    public TitleType getTitleType() {
+        return titleType;
+    }
+
+    public void setTitleType(TitleType titleType) {
+        this.titleType = titleType;
     }
 
     public long getPositionSeconds() {

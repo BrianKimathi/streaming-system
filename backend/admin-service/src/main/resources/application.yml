@@ -17,8 +17,14 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+health:
+  # Comma-separated name=baseUrl pairs probed by the operations health page.
+  services: ${HEALTH_SERVICES:api-gateway=http://localhost:8080,auth-service=http://localhost:8081,user-service=http://localhost:8082,catalog-service=http://localhost:8083,subscription-service=http://localhost:8084,billing-service=http://localhost:8085,device-service=http://localhost:8086,media-service=http://localhost:8087,playback-service=http://localhost:8088,watch-history-service=http://localhost:8089,trending-service=http://localhost:8090,analytics-service=http://localhost:8091,notification-service=http://localhost:8092}
+  redis-host: ${REDIS_HOST:}
+  redis-port: ${REDIS_PORT:6379}
+
 jwt:
-  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  secret: ${JWT_SECRET:9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a}
   access-token-expiration-ms: 900000
   refresh-token-expiration-ms: 604800000
 

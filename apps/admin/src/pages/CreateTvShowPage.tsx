@@ -1,149 +1,180 @@
 import React, { useState } from 'react';
-import { adminService } from '../services/adminService';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { adminService, audit } from '../services/adminService';
+import { errorMessage } from '../api/client';
+import type { ContentStatus, CreateTvShowRequest, TVShow } from '../types';
+import { ErrorBanner } from '../components/common/Feedback';
+import { GenrePicker, INPUT_CLASS, LABEL_CLASS, StatusSelect, optionalText } from './CreateMoviePage';
 
 interface CreateTvShowPageProps {
-  onBack: () => void;
+  onDone: (show: TVShow) => void;
+  onCancel: () => void;
 }
 
-export const CreateTvShowPage: React.FC<CreateTvShowPageProps> = ({ onBack }) => {
+export const CreateTvShowPage: React.FC<CreateTvShowPageProps> = ({ onDone, onCancel }) => {
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [releaseYear, setReleaseYear] = useState(2026);
-  const [maturityRating, setMaturityRating] = useState('TV-MA');
-  const [seasonsCount, setSeasonsCount] = useState(1);
-  const [status, setStatus] = useState<'PUBLISHED' | 'DRAFT'>('PUBLISHED');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [synopsis, setSynopsis] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [seasonsCount, setSeasonsCount] = useState('');
+  const [maturityRating, setMaturityRating] = useState('');
+  const [posterUrl, setPosterUrl] = useState('');
+  const [backdropUrl, setBackdropUrl] = useState('');
+  const [trailerUrl, setTrailerUrl] = useState('');
+  const [status, setStatus] = useState<ContentStatus>('DRAFT');
+  const [genreIds, setGenreIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError('Title is required.');
+      return;
+    }
+    let seasons: number | undefined;
+    if (seasonsCount.trim()) {
+      seasons = Number(seasonsCount);
+      if (!Number.isInteger(seasons) || seasons < 0 || seasons > 100) {
+        setError('Seasons must be a whole number between 0 and 100.');
+        return;
+      }
+    }
+
+    const request: CreateTvShowRequest = { title: trimmedTitle, status };
+    const synopsisValue = optionalText(synopsis);
+    if (synopsisValue) request.synopsis = synopsisValue;
+    if (releaseDate) request.releaseDate = releaseDate;
+    if (seasons !== undefined) request.seasonsCount = seasons;
+    const ratingValue = optionalText(maturityRating);
+    if (ratingValue) request.maturityRating = ratingValue;
+    const posterValue = optionalText(posterUrl);
+    if (posterValue) request.posterUrl = posterValue;
+    const backdropValue = optionalText(backdropUrl);
+    if (backdropValue) request.backdropUrl = backdropValue;
+    const trailerValue = optionalText(trailerUrl);
+    if (trailerValue) request.trailerUrl = trailerValue;
+    if (genreIds.length > 0) request.genreIds = genreIds;
+
+    setSubmitting(true);
+    setError(null);
     try {
-      setIsSubmitting(true);
-      await adminService.createTVShow({
-        title,
-        description,
-        releaseYear,
-        maturityRating,
-        seasonsCount,
-        status,
-        posterUrl: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=600&q=80',
-        bannerUrl: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=1200&q=80',
-      });
-      setSuccessMessage('TV Show successfully created!');
-      setTimeout(() => {
-        onBack();
-      }, 1500);
+      const created = await adminService.createTVShow(request);
+      audit({ action: 'TV_SHOW_CREATED', targetType: 'TV_SHOW', targetId: created.id, details: created.title });
+      onDone(created);
     } catch (err) {
-      console.error('Failed to create TV show:', err);
-    } finally {
-      setIsSubmitting(false);
+      setError(errorMessage(err, 'Failed to create TV show'));
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h3 className="text-lg font-bold text-white">Create New TV Show</h3>
-            <p className="text-xs text-slate-400">Add a multi-season TV show entry to the StreamX catalog.</p>
-          </div>
+      <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition disabled:opacity-50"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div>
+          <h3 className="text-lg font-bold text-white">Create New TV Show</h3>
+          <p className="text-xs text-slate-400">
+            The backend creates empty "Season n" records for the season count you enter. Only PUBLISHED titles are visible in the public apps.
+          </p>
         </div>
       </div>
 
-      {successMessage && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <CheckCircle className="w-4 h-4" />
-          {successMessage}
-        </div>
-      )}
+      <ErrorBanner message={error} />
 
       <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-        <div className="space-y-4">
+        <fieldset disabled={submitting} className="space-y-4">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Series Information</h4>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Show Title</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
-              placeholder="e.g. Stranger Things"
-            />
+            <label className={LABEL_CLASS}>Title *</label>
+            <input type="text" required maxLength={255} value={title} onChange={(e) => setTitle(e.target.value)} className={INPUT_CLASS} />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Series Overview</label>
-            <textarea
-              required
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
-              placeholder="Synopsis of the TV series plot..."
-            />
+            <label className={LABEL_CLASS}>Synopsis</label>
+            <textarea rows={4} value={synopsis} onChange={(e) => setSynopsis(e.target.value)} className={INPUT_CLASS} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Release Year</label>
-              <input
-                type="number"
-                required
-                value={releaseYear}
-                onChange={(e) => setReleaseYear(Number(e.target.value))}
-                className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
-              />
+              <label className={LABEL_CLASS}>Release Date</label>
+              <input type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className={INPUT_CLASS} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Initial Seasons Count</label>
+              <label className={LABEL_CLASS}>Seasons (0–100)</label>
               <input
                 type="number"
-                required
+                min={0}
+                max={100}
+                step={1}
                 value={seasonsCount}
-                onChange={(e) => setSeasonsCount(Number(e.target.value))}
-                className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                onChange={(e) => setSeasonsCount(e.target.value)}
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Maturity Rating</label>
-              <select
-                value={maturityRating}
-                onChange={(e) => setMaturityRating(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
-              >
-                <option value="TV-Y">TV-Y - All Children</option>
-                <option value="TV-PG">TV-PG - Parental Guidance</option>
-                <option value="TV-14">TV-14 - Parents Strongly Cautioned</option>
-                <option value="TV-MA">TV-MA - Mature Audience Only</option>
+              <label className={LABEL_CLASS}>Maturity Rating</label>
+              <select value={maturityRating} onChange={(e) => setMaturityRating(e.target.value)} className={INPUT_CLASS}>
+                <option value="">Not set</option>
+                <option value="TV-Y">TV-Y</option>
+                <option value="TV-Y7">TV-Y7</option>
+                <option value="TV-G">TV-G</option>
+                <option value="TV-PG">TV-PG</option>
+                <option value="TV-14">TV-14</option>
+                <option value="TV-MA">TV-MA</option>
               </select>
             </div>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className={LABEL_CLASS}>Poster URL</label>
+              <input type="url" value={posterUrl} onChange={(e) => setPosterUrl(e.target.value)} className={INPUT_CLASS} />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Backdrop URL</label>
+              <input type="url" value={backdropUrl} onChange={(e) => setBackdropUrl(e.target.value)} className={INPUT_CLASS} />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Trailer URL</label>
+              <input type="url" value={trailerUrl} onChange={(e) => setTrailerUrl(e.target.value)} className={INPUT_CLASS} />
+            </div>
+          </div>
+
+          <div className="max-w-xs">
+            <label className={LABEL_CLASS}>Initial Status</label>
+            <StatusSelect value={status} onChange={setStatus} />
+          </div>
+
+          <div>
+            <label className={LABEL_CLASS}>Genres</label>
+            <GenrePicker selected={genreIds} onChange={setGenreIds} disabled={submitting} />
+          </div>
+        </fieldset>
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
           <button
             type="button"
-            onClick={onBack}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
+            onClick={onCancel}
+            disabled={submitting}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={submitting}
             className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : 'Save & Create TV Show'}
+            {submitting ? 'Creating…' : 'Create TV Show'}
           </button>
         </div>
       </form>

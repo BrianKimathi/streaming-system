@@ -23,20 +23,13 @@ public class NotificationController {
 
     @GetMapping("/user")
     public ResponseEntity<ApiResponse<List<NotificationResponseDto>>> getUserNotifications(
-            @RequestHeader(value = SecurityConstants.HEADER_X_ACCOUNT_ID, required = false) String accountIdHeader,
-            @RequestParam(required = false) UUID accountId) {
+            @RequestHeader(value = SecurityConstants.HEADER_X_ACCOUNT_ID, required = false) String accountIdHeader) {
 
-        UUID targetAccountId = accountId;
-        if (targetAccountId == null && accountIdHeader != null) {
-            targetAccountId = UUID.fromString(accountIdHeader);
+        if (accountIdHeader == null || accountIdHeader.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Authentication required"));
         }
 
-        if (targetAccountId == null) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Account ID must be provided via header or request parameter"));
-        }
-
-        List<NotificationResponseDto> notifications = notificationService.getUserNotifications(targetAccountId);
+        List<NotificationResponseDto> notifications = notificationService.getUserNotifications(UUID.fromString(accountIdHeader));
         return ResponseEntity.ok(ApiResponse.success("User notifications retrieved successfully", notifications));
     }
 
@@ -44,6 +37,6 @@ public class NotificationController {
     public ResponseEntity<ApiResponse<NotificationResponseDto>> sendNotification(
             @RequestBody SendNotificationRequestDto request) {
         NotificationResponseDto response = notificationService.sendNotification(request);
-        return ResponseEntity.ok(ApiResponse.success("Notification dispatched successfully", response));
+        return ResponseEntity.ok(ApiResponse.success("Notification " + response.getStatus().toLowerCase(), response));
     }
 }

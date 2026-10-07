@@ -49,6 +49,20 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @PostMapping("/me/cancel")
+    public ResponseEntity<ApiResponse<SubscriptionResponse>> cancelMySubscription(
+            @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId) {
+        SubscriptionResponse response = subscriptionService.cancel(accountId);
+        return ResponseEntity.ok(ApiResponse.success("Your subscription will end at the close of the current period", response));
+    }
+
+    @PostMapping("/me/resume")
+    public ResponseEntity<ApiResponse<SubscriptionResponse>> resumeMySubscription(
+            @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId) {
+        SubscriptionResponse response = subscriptionService.resume(accountId);
+        return ResponseEntity.ok(ApiResponse.success("Your subscription will continue", response));
+    }
+
     @GetMapping("/entitlements")
     public ResponseEntity<ApiResponse<EntitlementsResponse>> getEntitlements(
             @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId) {

@@ -14,4 +14,7 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
     List<Device> findByAccountIdAndStatus(UUID accountId, DeviceStatus status);
     long countByAccountIdAndStatus(UUID accountId, DeviceStatus status);
     Optional<Device> findByAccountIdAndDeviceFingerprint(UUID accountId, String deviceFingerprint);
+    List<Device> findByAccountId(UUID accountId);
+    List<Device> findByAccountIdOrderByRegisteredAtDesc(UUID accountId);
+    long countByStatus(DeviceStatus status);
 }

@@ -18,9 +18,24 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  secret: ${JWT_SECRET:9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a}
   access-token-expiration-ms: 900000
   refresh-token-expiration-ms: 604800000
+
+# Safaricom Daraja (M-Pesa STK Push). Checkout returns 503 until key, secret, shortcode, passkey and callback token are set.
+mpesa:
+  environment: ${MPESA_ENVIRONMENT:sandbox}
+  consumer-key: ${MPESA_CONSUMER_KEY:}
+  consumer-secret: ${MPESA_CONSUMER_SECRET:}
+  shortcode: ${MPESA_SHORTCODE:}
+  passkey: ${MPESA_PASSKEY:}
+  transaction-type: ${MPESA_TRANSACTION_TYPE:CustomerPayBillOnline}
+  callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://streamxapi.briankimathi.dev/api/v1/billing/mpesa/callback}
+  callback-token: ${MPESA_CALLBACK_TOKEN:}
+
+services:
+  subscription-url: ${SUBSCRIPTION_SERVICE_URL:http://localhost:8084}
+  notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8092}
 
 logging:
   level:

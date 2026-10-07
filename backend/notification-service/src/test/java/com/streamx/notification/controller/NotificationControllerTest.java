@@ -45,10 +45,54 @@ class NotificationControllerTest {
 
         when(notificationService.getUserNotifications(accountId)).thenReturn(List.of(dto));
 
-        mockMvc.perform(get("/api/v1/notifications/user?accountId=" + accountId))
+        mockMvc.perform(get("/api/v1/notifications/user").header("X-Account-Id", accountId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].recipient").value("user@example.com"));
+    }
+
+    @Test
+    void getUserNotifications_IncludesFailureReasonAndKeepsServiceOrder() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        NotificationResponseDto newest = new NotificationResponseDto(
+                UUID.randomUUID(), accountId, accountId.toString(), "IN_APP", "PAYMENT_FAILED", "Payment failed", "Body", "DELIVERED", Instant.now()
+        );
+        NotificationResponseDto older = new NotificationResponseDto(
+                UUID.randomUUID(), accountId, "user@example.com", "EMAIL", "WELCOME", "Welcome", "Body", "FAILED", Instant.now().minusSeconds(60)
+        );
+        older.setFailureReason("Email delivery is not configured (set SPRING_MAIL_HOST and credentials)");
+        when(notificationService.getUserNotifications(accountId)).thenReturn(List.of(newest, older));
+
+        mockMvc.perform(get("/api/v1/notifications/user").header("X-Account-Id", accountId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].template").value("PAYMENT_FAILED"))
+                .andExpect(jsonPath("$.data[1].status").value("FAILED"))
+                .andExpect(jsonPath("$.data[1].failureReason").value("Email delivery is not configured (set SPRING_MAIL_HOST and credentials)"));
+    }
+
+    @Test
+    void getUserNotifications_WithoutAccountHeaderReturns401() throws Exception {
+        mockMvc.perform(get("/api/v1/notifications/user"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void sendInAppNotificationFromInternalCallerWithoutGatewayHeaders() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        NotificationResponseDto dto = new NotificationResponseDto(
+                UUID.randomUUID(), accountId, accountId.toString(), "IN_APP", "PAYMENT_SUCCESS", "Payment received", "Your plan is active", "DELIVERED", Instant.now()
+        );
+        when(notificationService.sendNotification(any(SendNotificationRequestDto.class))).thenReturn(dto);
+
+        String body = "{\"accountId\":\"" + accountId + "\",\"recipient\":\"" + accountId + "\",\"channel\":\"IN_APP\","
+                + "\"template\":\"PAYMENT_SUCCESS\",\"subject\":\"Payment received\",\"body\":\"Your plan is active\"}";
+
+        mockMvc.perform(post("/api/v1/notifications/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.channel").value("IN_APP"))
+                .andExpect(jsonPath("$.data.status").value("DELIVERED"));
     }
 
     @Test

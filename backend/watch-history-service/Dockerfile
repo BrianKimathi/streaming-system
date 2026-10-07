@@ -1,7 +1,7 @@
 FROM maven:3.9-eclipse-temurin-24-alpine AS builder
 WORKDIR /build
 COPY . .
-RUN mvn clean package -DskipTests -pl watch-history-service -am
+RUN --mount=type=cache,target=/root/.m2 mvn -B -q package -DskipTests -pl watch-history-service -am
 
 FROM eclipse-temurin:24-jre-alpine
 WORKDIR /app

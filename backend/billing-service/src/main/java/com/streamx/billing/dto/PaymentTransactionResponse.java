@@ -9,28 +9,19 @@ public class PaymentTransactionResponse {
     private String id;
     private String accountId;
     private String subscriptionId;
+    private String planId;
+    private String planName;
     private BigDecimal amount;
     private String currency;
     private PaymentStatus status;
     private String paymentMethod;
+    private String phoneNumber;
     private String externalTransactionId;
+    private String errorMessage;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public PaymentTransactionResponse() {
-    }
-
-    public PaymentTransactionResponse(String id, String accountId, String subscriptionId, BigDecimal amount,
-                                      String currency, PaymentStatus status, String paymentMethod,
-                                      String externalTransactionId, LocalDateTime createdAt) {
-        this.id = id;
-        this.accountId = accountId;
-        this.subscriptionId = subscriptionId;
-        this.amount = amount;
-        this.currency = currency;
-        this.status = status;
-        this.paymentMethod = paymentMethod;
-        this.externalTransactionId = externalTransactionId;
-        this.createdAt = createdAt;
     }
 
     public String getId() {
@@ -55,6 +46,22 @@ public class PaymentTransactionResponse {
 
     public void setSubscriptionId(String subscriptionId) {
         this.subscriptionId = subscriptionId;
+    }
+
+    public String getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(String planId) {
+        this.planId = planId;
+    }
+
+    public String getPlanName() {
+        return planName;
+    }
+
+    public void setPlanName(String planName) {
+        this.planName = planName;
     }
 
     public BigDecimal getAmount() {
@@ -89,6 +96,14 @@ public class PaymentTransactionResponse {
         this.paymentMethod = paymentMethod;
     }
 
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
     public String getExternalTransactionId() {
         return externalTransactionId;
     }
@@ -97,11 +112,27 @@ public class PaymentTransactionResponse {
         this.externalTransactionId = externalTransactionId;
     }
 
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

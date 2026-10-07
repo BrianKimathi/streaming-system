@@ -19,6 +19,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { humanizeRole } from '../../utils/format';
 
 interface SidebarProps {
   currentTab: string;
@@ -26,7 +27,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => {
-  const { logout, email } = useAuth();
+  const { logout, email, roles } = useAuth();
+  const primaryRole = roles.length > 0 ? humanizeRole(roles[0]) : 'Administrator';
 
   const navItems = [
     { id: 'dashboard', label: 'Executive Dashboard', icon: LayoutDashboard },
@@ -85,11 +87,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange }) => 
       <div className="p-4 border-t border-slate-800 bg-slate-900">
         <div className="flex items-center justify-between">
           <div className="truncate pr-2">
-            <p className="text-xs font-semibold text-white truncate">{email || 'admin@streamx.io'}</p>
-            <p className="text-[11px] text-slate-400">Super Administrator</p>
+            <p className="text-xs font-semibold text-white truncate">{email}</p>
+            <p className="text-[11px] text-slate-400">{primaryRole}</p>
           </div>
           <button
-            onClick={logout}
+            onClick={() => void logout()}
             title="Log Out"
             className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
           >

@@ -23,11 +23,17 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
 
 jwt:
-  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  secret: ${JWT_SECRET:9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a}
   access-token-expiration-ms: 900000 # 15 minutes
   refresh-token-expiration-ms: 604800000 # 7 days
 
+services:
+  user-url: ${USER_SERVICE_URL:http://localhost:8082}
+
 app:
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
   otp:
     expiration-minutes: 5
     max-attempts: 3

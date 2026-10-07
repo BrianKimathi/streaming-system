@@ -2,7 +2,9 @@ package com.streamx.admin.service;
 
 import com.streamx.admin.domain.*;
 import com.streamx.admin.repository.*;
+import com.streamx.admin.security.AdminIdentity;
 import com.streamx.common.events.AuditLogEvent;
+import com.streamx.common.exception.BadRequestException;
 import com.streamx.common.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +18,10 @@ import java.util.*;
 public class AdminService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+    private static final Set<String> SEVERITIES = Set.of("SEV1", "SEV2", "SEV3", "SEV4");
+    private static final Set<String> INCIDENT_STATUSES = Set.of("OPEN", "INVESTIGATING", "MITIGATED", "RESOLVED", "CLOSED");
+    private static final Set<String> TICKET_STATUSES = Set.of("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED");
+    private static final Set<String> TICKET_PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "URGENT");
 
     private final AuditLogRepository auditLogRepository;
     private final FeatureFlagRepository featureFlagRepository;
@@ -37,109 +43,172 @@ public class AdminService {
         return auditLogRepository.findTop50ByOrderByTimestampDesc();
     }
 
+    /**
+     * Records an action performed by the calling administrator. Identity fields always come from the
+     * authenticated request, never from the client payload.
+     */
     @Transactional
-    public AuditLog recordAuditLog(AuditLogEvent event) {
+    public AuditLog recordAuditLog(AdminIdentity admin, AuditLogEvent event) {
+        if (event.getAction() == null || event.getAction().isBlank()) {
+            throw new BadRequestException("action is required");
+        }
+        return audit(admin, event.getAction(), event.getTargetType(), event.getTargetId(), event.getReason(), event.getDetails());
+    }
+
+    private AuditLog audit(AdminIdentity admin, String action, String targetType, String targetId, String reason, String details) {
         AuditLog audit = new AuditLog(
-                event.getAdministratorId(),
-                event.getAdministratorEmail() != null ? event.getAdministratorEmail() : "admin@streamx.io",
-                event.getRole() != null ? event.getRole() : "SUPER_ADMIN",
-                event.getAction(),
-                event.getTargetType(),
-                event.getTargetId(),
-                event.getReason(),
-                event.getIpAddress(),
-                event.getCorrelationId(),
-                event.getDetails()
+                admin.accountId(),
+                admin.displayName(),
+                admin.primaryRole(),
+                action,
+                targetType == null || targetType.isBlank() ? "SYSTEM" : targetType,
+                targetId,
+                reason,
+                admin.ipAddress(),
+                UUID.randomUUID().toString(),
+                details
         );
-        log.info("Audit logged action: {} on target: {} by admin: {}", event.getAction(), event.getTargetId(), event.getAdministratorEmail());
+        log.info("Audit: {} on {} {} by {}", action, targetType, targetId, admin.displayName());
         return auditLogRepository.save(audit);
     }
 
     // --- Feature Flags ---
     public List<FeatureFlag> getFeatureFlags() {
-        List<FeatureFlag> flags = featureFlagRepository.findAll();
-        if (flags.isEmpty()) {
-            // Seed initial feature flags
-            FeatureFlag f1 = featureFlagRepository.save(new FeatureFlag("NEW_PLAYER", "Next-Gen HTML5 HLS Player", true, 100));
-            FeatureFlag f2 = featureFlagRepository.save(new FeatureFlag("AI_RECOMMENDATIONS", "Personalized ML Recommendations", true, 20));
-            FeatureFlag f3 = featureFlagRepository.save(new FeatureFlag("OFFLINE_DOWNLOADS", "Encrypted Offline Mobile Downloads", true, 100));
-            return List.of(f1, f2, f3);
-        }
-        return flags;
+        return featureFlagRepository.findAll().stream()
+                .sorted(Comparator.comparing(FeatureFlag::getFlagKey))
+                .toList();
     }
 
     @Transactional
-    public FeatureFlag toggleFeatureFlag(String flagKey, boolean enabled, int percentage, String adminEmail, String reason) {
+    public FeatureFlag createFeatureFlag(AdminIdentity admin, String flagKey, String description, boolean enabled, int percentage) {
+        String key = normalizeFlagKey(flagKey);
+        if (featureFlagRepository.findByFlagKey(key).isPresent()) {
+            throw new BadRequestException("Feature flag " + key + " already exists");
+        }
+        FeatureFlag flag = new FeatureFlag(key, description, enabled, clampPercentage(percentage));
+        flag.setLastModifiedBy(admin.displayName());
+        FeatureFlag saved = featureFlagRepository.save(flag);
+        audit(admin, "FEATURE_FLAG_CREATED", "FEATURE_FLAG", key, null,
+                "Enabled: " + enabled + ", Percentage: " + saved.getTargetPercentage());
+        return saved;
+    }
+
+    @Transactional
+    public FeatureFlag toggleFeatureFlag(AdminIdentity admin, String flagKey, boolean enabled, int percentage, String reason) {
         FeatureFlag flag = featureFlagRepository.findByFlagKey(flagKey)
-                .orElseGet(() -> new FeatureFlag(flagKey, "Feature Flag " + flagKey, enabled, percentage));
+                .orElseThrow(() -> new ResourceNotFoundException("Feature flag not found: " + flagKey));
 
         flag.setEnabled(enabled);
-        flag.setTargetPercentage(percentage);
-        flag.setLastModifiedBy(adminEmail);
+        flag.setTargetPercentage(clampPercentage(percentage));
+        flag.setLastModifiedBy(admin.displayName());
         flag.setLastModifiedAt(Instant.now());
-
         FeatureFlag saved = featureFlagRepository.save(flag);
 
-        // Record Audit Log
-        recordAuditLog(new AuditLogEvent(
-                UUID.randomUUID(), Instant.now(), null, adminEmail, "SUPER_ADMIN",
-                "FEATURE_FLAG_CHANGED", "FEATURE_FLAG", flagKey, reason, "127.0.0.1",
-                UUID.randomUUID().toString(), "Enabled: " + enabled + ", Percentage: " + percentage
-        ));
-
+        audit(admin, "FEATURE_FLAG_CHANGED", "FEATURE_FLAG", flagKey, reason,
+                "Enabled: " + enabled + ", Percentage: " + saved.getTargetPercentage());
         return saved;
     }
 
     // --- Incident Management ---
     public List<Incident> getIncidents() {
-        return incidentRepository.findAll();
+        return incidentRepository.findAllByOrderByCreatedAtDesc();
     }
 
     @Transactional
-    public Incident createIncident(String title, String description, String severity, String affectedServices, String createdBy) {
-        Incident incident = new Incident(title, description, severity, "OPEN", affectedServices, createdBy);
-        return incidentRepository.save(incident);
+    public Incident createIncident(AdminIdentity admin, String title, String description, String severity, String affectedServices) {
+        if (title == null || title.isBlank()) {
+            throw new BadRequestException("title is required");
+        }
+        String sev = severity == null ? "SEV3" : severity.toUpperCase(Locale.ROOT);
+        if (!SEVERITIES.contains(sev)) {
+            throw new BadRequestException("severity must be one of " + SEVERITIES);
+        }
+        Incident saved = incidentRepository.save(
+                new Incident(title.trim(), description, sev, "OPEN", affectedServices, admin.displayName()));
+        audit(admin, "INCIDENT_CREATED", "INCIDENT", saved.getId().toString(), null, sev + ": " + title);
+        return saved;
+    }
+
+    @Transactional
+    public Incident updateIncidentStatus(AdminIdentity admin, UUID incidentId, String status) {
+        String next = status == null ? "" : status.toUpperCase(Locale.ROOT);
+        if (!INCIDENT_STATUSES.contains(next)) {
+            throw new BadRequestException("status must be one of " + INCIDENT_STATUSES);
+        }
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found"));
+        String previous = incident.getStatus();
+        incident.setStatus(next);
+        if ((next.equals("RESOLVED") || next.equals("CLOSED")) && incident.getResolvedAt() == null) {
+            incident.setResolvedAt(Instant.now());
+        } else if (!next.equals("RESOLVED") && !next.equals("CLOSED")) {
+            incident.setResolvedAt(null);
+        }
+        Incident saved = incidentRepository.save(incident);
+        audit(admin, "INCIDENT_STATUS_CHANGED", "INCIDENT", incidentId.toString(), null, previous + " -> " + next);
+        return saved;
     }
 
     // --- Support Ticketing ---
     public List<SupportTicket> getSupportTickets() {
-        return supportTicketRepository.findAll();
+        return supportTicketRepository.findAllByOrderByCreatedAtDesc();
     }
 
     @Transactional
-    public SupportTicket createSupportTicket(UUID accountId, String userEmail, String category, String priority, String subject, String body) {
-        SupportTicket ticket = new SupportTicket(accountId, userEmail, category, priority, "OPEN", subject, body);
-        return supportTicketRepository.save(ticket);
+    public SupportTicket createSupportTicket(AdminIdentity admin, UUID accountId, String userEmail, String category,
+                                             String priority, String subject, String body) {
+        if (subject == null || subject.isBlank()) {
+            throw new BadRequestException("subject is required");
+        }
+        String prio = priority == null ? "MEDIUM" : priority.toUpperCase(Locale.ROOT);
+        if (!TICKET_PRIORITIES.contains(prio)) {
+            throw new BadRequestException("priority must be one of " + TICKET_PRIORITIES);
+        }
+        SupportTicket saved = supportTicketRepository.save(
+                new SupportTicket(accountId, userEmail, category, prio, "OPEN", subject.trim(), body));
+        audit(admin, "TICKET_CREATED", "SUPPORT_TICKET", saved.getId().toString(), null, subject);
+        return saved;
     }
 
-    // --- System Health Monitoring ---
-    public Map<String, Object> getSystemHealth() {
-        Map<String, Object> health = new LinkedHashMap<>();
-        health.put("status", "UP");
-        health.put("timestamp", Instant.now());
+    @Transactional
+    public SupportTicket updateSupportTicket(AdminIdentity admin, UUID ticketId, String status, String assignedAgentEmail) {
+        SupportTicket ticket = supportTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Support ticket not found"));
+        List<String> changes = new ArrayList<>();
+        if (status != null && !status.isBlank()) {
+            String next = status.toUpperCase(Locale.ROOT);
+            if (!TICKET_STATUSES.contains(next)) {
+                throw new BadRequestException("status must be one of " + TICKET_STATUSES);
+            }
+            changes.add("status " + ticket.getStatus() + " -> " + next);
+            ticket.setStatus(next);
+        }
+        if (assignedAgentEmail != null) {
+            String agent = assignedAgentEmail.isBlank() ? null : assignedAgentEmail.trim();
+            changes.add("assignee -> " + (agent == null ? "unassigned" : agent));
+            ticket.setAssignedAgentEmail(agent);
+        }
+        if (changes.isEmpty()) {
+            throw new BadRequestException("Nothing to update");
+        }
+        ticket.setUpdatedAt(Instant.now());
+        SupportTicket saved = supportTicketRepository.save(ticket);
+        audit(admin, "TICKET_UPDATED", "SUPPORT_TICKET", ticketId.toString(), null, String.join(", ", changes));
+        return saved;
+    }
 
-        Map<String, String> services = new LinkedHashMap<>();
-        services.put("auth-service", "UP (Latency: 12ms)");
-        services.put("user-service", "UP (Latency: 8ms)");
-        services.put("catalog-service", "UP (Latency: 15ms)");
-        services.put("subscription-service", "UP (Latency: 10ms)");
-        services.put("billing-service", "UP (Latency: 18ms)");
-        services.put("device-service", "UP (Latency: 9ms)");
-        services.put("media-service", "UP (FFmpeg Transcoder Active)");
-        services.put("playback-service", "UP (Concurrent Streams Normal)");
-        services.put("watch-history-service", "UP (Redis Cache Hit 98.4%)");
-        services.put("trending-service", "UP (Velocity Score Pipeline Active)");
-        services.put("analytics-service", "UP (Kafka Consumer Active)");
-        services.put("notification-service", "UP (Multi-channel Ready)");
-        services.put("api-gateway", "UP (Reactive Netty)");
+    private static int clampPercentage(int percentage) {
+        return Math.max(0, Math.min(100, percentage));
+    }
 
-        health.put("services", services);
-        health.put("infrastructure", Map.of(
-                "postgres", "UP (Connections: 18/100)",
-                "redis", "UP (Memory: 24.5 MB)",
-                "kafka", "UP (Consumer Lag: 0)"
-        ));
-
-        return health;
+    private static String normalizeFlagKey(String flagKey) {
+        if (flagKey == null || flagKey.isBlank()) {
+            throw new BadRequestException("flagKey is required");
+        }
+        String key = flagKey.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]", "_");
+        if (key.length() > 100) {
+            throw new BadRequestException("flagKey is too long");
+        }
+        return key;
     }
 }

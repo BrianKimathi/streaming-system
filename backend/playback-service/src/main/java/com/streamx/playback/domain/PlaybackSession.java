@@ -53,9 +53,12 @@ public class PlaybackSession {
 
     @PrePersist
     protected void onCreate() {
-        startTime = LocalDateTime.now();
-        lastHeartbeat = LocalDateTime.now();
-        expiresAt = LocalDateTime.now().plusHours(4); // Default 4 hour expiration
+        LocalDateTime now = LocalDateTime.now();
+        startTime = now;
+        lastHeartbeat = now;
+        if (expiresAt == null) {
+            expiresAt = now.plusHours(4);
+        }
     }
 
     public UUID getId() {

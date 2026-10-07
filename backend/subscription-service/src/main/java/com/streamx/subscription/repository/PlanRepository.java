@@ -11,6 +11,7 @@ import java.util.UUID;
 @Repository
 public interface PlanRepository extends JpaRepository<Plan, UUID> {
     List<Plan> findByActiveTrue();
+    List<Plan> findByActiveTrueOrderByPriceAscNameAsc();
     Optional<Plan> findByNameAndVersion(String name, int version);
     Optional<Plan> findFirstByNameOrderByVersionDesc(String name);
 }

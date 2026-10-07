@@ -1,233 +1,273 @@
-version: '3.8'
+# Secrets come from backend/.env (git-ignored). See .env.example.
+
+x-java-env: &java-env
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in backend/.env}
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-streamx}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-streamx_password}
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
+  JAVA_TOOL_OPTIONS: ${JAVA_OPTS:--Xmx192m -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m}
+  AUTH_SERVICE_URL: http://auth-service:8081
+  USER_SERVICE_URL: http://user-service:8082
+  CATALOG_SERVICE_URL: http://catalog-service:8083
+  SUBSCRIPTION_SERVICE_URL: http://subscription-service:8084
+  BILLING_SERVICE_URL: http://billing-service:8085
+  DEVICE_SERVICE_URL: http://device-service:8086
+  MEDIA_SERVICE_URL: http://media-service:8087
+  PLAYBACK_SERVICE_URL: http://playback-service:8088
+  WATCH_HISTORY_SERVICE_URL: http://watch-history-service:8089
+  TRENDING_SERVICE_URL: http://trending-service:8090
+  NOTIFICATION_SERVICE_URL: http://notification-service:8092
+
+x-java-service: &java-service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
 
 services:
   postgres:
     image: postgres:16-alpine
     container_name: streamx-postgres
+    restart: unless-stopped
+    command: postgres -c max_connections=200
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
     environment:
-      POSTGRES_USER: streamx
-      POSTGRES_PASSWORD: streamx_password
+      POSTGRES_USER: ${POSTGRES_USER:-streamx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-streamx_password}
       POSTGRES_DB: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U streamx -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-streamx} -d postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
     container_name: streamx-redis
+    restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: streamx-kafka
-    ports:
-      - "${KAFKA_PORT:-9093}:9092"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
-
   auth-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./auth-service/Dockerfile
     container_name: streamx-auth-service
     ports:
-      - "${AUTH_PORT:-18081}:8081"
+      - "127.0.0.1:${AUTH_PORT:-18081}:8081"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   user-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./user-service/Dockerfile
     container_name: streamx-user-service
     ports:
-      - "${USER_PORT:-18082}:8082"
+      - "127.0.0.1:${USER_PORT:-18082}:8082"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   catalog-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./catalog-service/Dockerfile
     container_name: streamx-catalog-service
     ports:
-      - "${CATALOG_PORT:-18083}:8083"
+      - "127.0.0.1:${CATALOG_PORT:-18083}:8083"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catalog_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   subscription-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./subscription-service/Dockerfile
     container_name: streamx-subscription-service
     ports:
-      - "${SUBSCRIPTION_PORT:-18084}:8084"
+      - "127.0.0.1:${SUBSCRIPTION_PORT:-18084}:8084"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/subscription_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   billing-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./billing-service/Dockerfile
     container_name: streamx-billing-service
     ports:
-      - "${BILLING_PORT:-18085}:8085"
+      - "127.0.0.1:${BILLING_PORT:-18085}:8085"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/billing_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      MPESA_ENVIRONMENT: ${MPESA_ENVIRONMENT:-sandbox}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-}
+      MPESA_TRANSACTION_TYPE: ${MPESA_TRANSACTION_TYPE:-CustomerPayBillOnline}
+      MPESA_CALLBACK_BASE_URL: ${MPESA_CALLBACK_BASE_URL:-https://streamxapi.briankimathi.dev/api/v1/billing/mpesa/callback}
+      MPESA_CALLBACK_TOKEN: ${MPESA_CALLBACK_TOKEN:-}
 
   device-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./device-service/Dockerfile
     container_name: streamx-device-service
     ports:
-      - "${DEVICE_PORT:-18086}:8086"
+      - "127.0.0.1:${DEVICE_PORT:-18086}:8086"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/device_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   media-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./media-service/Dockerfile
     container_name: streamx-media-service
     ports:
-      - "${MEDIA_PORT:-18087}:8087"
+      - "127.0.0.1:${MEDIA_PORT:-18087}:8087"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/media_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      MEDIA_STORAGE_PATH: /app/media-storage
+      MEDIA_TRANSCODE_THREADS: ${MEDIA_TRANSCODE_THREADS:-2}
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${MEDIA_MAX_UPLOAD:-2GB}
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${MEDIA_MAX_UPLOAD:-2GB}
+    volumes:
+      - media_data:/app/media-storage
 
   playback-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./playback-service/Dockerfile
     container_name: streamx-playback-service
     ports:
-      - "${PLAYBACK_PORT:-18088}:8088"
+      - "127.0.0.1:${PLAYBACK_PORT:-18088}:8088"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/playback_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      SUBSCRIPTION_SERVICE_URL: http://subscription-service:8084
 
   watch-history-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./watch-history-service/Dockerfile
     container_name: streamx-watch-history-service
     ports:
-      - "${WATCH_HISTORY_PORT:-18089}:8089"
+      - "127.0.0.1:${WATCH_HISTORY_PORT:-18089}:8089"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/watch_history_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   trending-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./trending-service/Dockerfile
     container_name: streamx-trending-service
     ports:
-      - "${TRENDING_PORT:-18090}:8090"
+      - "127.0.0.1:${TRENDING_PORT:-18090}:8090"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trending_db
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   analytics-service:
     build:
       context: .
       dockerfile: ./analytics-service/Dockerfile
     container_name: streamx-analytics-service
+    restart: unless-stopped
     ports:
-      - "${ANALYTICS_PORT:-18091}:8091"
+      - "127.0.0.1:${ANALYTICS_PORT:-18091}:8091"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/analytics_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in backend/.env}
+      JAVA_TOOL_OPTIONS: ${JAVA_OPTS:--Xmx192m -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8083
+      SUBSCRIPTION_SERVICE_URL: http://subscription-service:8084
+      BILLING_SERVICE_URL: http://billing-service:8085
+      DEVICE_SERVICE_URL: http://device-service:8086
+      MEDIA_SERVICE_URL: http://media-service:8087
+      PLAYBACK_SERVICE_URL: http://playback-service:8088
+      WATCH_HISTORY_SERVICE_URL: http://watch-history-service:8089
+      NOTIFICATION_SERVICE_URL: http://notification-service:8092
 
   notification-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./notification-service/Dockerfile
     container_name: streamx-notification-service
     ports:
-      - "${NOTIFICATION_PORT:-18092}:8092"
+      - "127.0.0.1:${NOTIFICATION_PORT:-18092}:8092"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      SPRING_MAIL_HOST: ${SMTP_HOST:-}
+      SPRING_MAIL_PORT: ${SMTP_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SMTP_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SMTP_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SMTP_AUTH:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SMTP_STARTTLS:-true}
+      MAIL_FROM: ${MAIL_FROM:-}
 
   admin-service:
+    <<: *java-service
     build:
       context: .
       dockerfile: ./admin-service/Dockerfile
     container_name: streamx-admin-service
     ports:
-      - "${ADMIN_PORT:-18093}:8093"
+      - "127.0.0.1:${ADMIN_PORT:-18093}:8093"
     environment:
+      <<: *java-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/admin_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      HEALTH_SERVICES: api-gateway=http://api-gateway:8080,auth-service=http://auth-service:8081,user-service=http://user-service:8082,catalog-service=http://catalog-service:8083,subscription-service=http://subscription-service:8084,billing-service=http://billing-service:8085,device-service=http://device-service:8086,media-service=http://media-service:8087,playback-service=http://playback-service:8088,watch-history-service=http://watch-history-service:8089,trending-service=http://trending-service:8090,analytics-service=http://analytics-service:8091,notification-service=http://notification-service:8092
 
   api-gateway:
     build:
       context: .
       dockerfile: ./api-gateway/Dockerfile
     container_name: streamx-api-gateway
+    restart: unless-stopped
     ports:
-      - "${GATEWAY_PORT:-9080}:8080"
+      - "127.0.0.1:${GATEWAY_PORT:-9080}:8080"
     environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in backend/.env}
+      JAVA_TOOL_OPTIONS: ${JAVA_OPTS:--Xmx192m -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m}
       AUTH_SERVICE_URL: http://auth-service:8081
       USER_SERVICE_URL: http://user-service:8082
       CATALOG_SERVICE_URL: http://catalog-service:8083
@@ -243,16 +283,19 @@ services:
       ADMIN_SERVICE_URL: http://admin-service:8093
     depends_on:
       - auth-service
-      - user-service
-      - catalog-service
+      - admin-service
 
   admin-web:
     build:
       context: ../apps/admin
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${ADMIN_API_URL:-https://streamxapi.briankimathi.dev/api/v1}
     container_name: streamx-admin-web
+    restart: unless-stopped
     ports:
-      - "${ADMIN_WEB_PORT:-9090}:80"
+      - "127.0.0.1:${ADMIN_WEB_PORT:-9090}:80"
 
 volumes:
   postgres_data:
+  media_data:

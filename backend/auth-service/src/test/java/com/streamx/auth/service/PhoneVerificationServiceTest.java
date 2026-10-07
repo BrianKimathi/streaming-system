@@ -1,13 +1,17 @@
 package com.streamx.auth.service;
 
-import com.streamx.auth.sms.MockSmsProvider;
-
+import com.streamx.auth.domain.PhoneVerificationOtp;
+import com.streamx.auth.exception.ServiceUnavailableException;
+import com.streamx.auth.repository.PhoneVerificationOtpRepository;
 import com.streamx.common.exception.BadRequestException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,29 +24,45 @@ class PhoneVerificationServiceTest {
     private PhoneVerificationService phoneVerificationService;
 
     @Autowired
-    private MockSmsProvider mockSmsProvider;
+    private PhoneVerificationOtpRepository otpRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private void storeOtp(String phone, String code) {
+        PhoneVerificationOtp otp = new PhoneVerificationOtp();
+        otp.setPhoneNumber(phone);
+        otp.setHashedOtp(passwordEncoder.encode(code));
+        otp.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+        otp.setResendCooldownUntil(LocalDateTime.now());
+        otp.setAttempts(0);
+        otp.setVerified(false);
+        otpRepository.save(otp);
+    }
 
     @Test
-    void testSendOtpAndVerifySuccess() {
+    void testSendOtpFailsHonestlyWhenSmsIsNotConfigured() {
         String phone = "+19998887777";
-        phoneVerificationService.sendOtp(phone);
 
-        String smsBody = mockSmsProvider.getLastSentSms(phone);
-        assertNotNull(smsBody);
-        assertTrue(smsBody.contains("Your StreamX verification code is:"));
+        ServiceUnavailableException ex = assertThrows(ServiceUnavailableException.class,
+                () -> phoneVerificationService.sendOtp(phone));
 
-        // Extract 6-digit code from mock message
-        String otpCode = smsBody.replaceAll(".*: (\\d{6}).*", "$1");
-        assertEquals(6, otpCode.length());
+        assertEquals("SMS delivery is not configured", ex.getMessage());
+        assertTrue(otpRepository.findFirstByPhoneNumberAndVerifiedFalseOrderByCreatedAtDesc(phone).isEmpty());
+    }
 
-        boolean verified = phoneVerificationService.verifyOtp(phone, otpCode);
-        assertTrue(verified);
+    @Test
+    void testVerifyValidOtpSucceeds() {
+        String phone = "+15550001111";
+        storeOtp(phone, "123456");
+
+        assertTrue(phoneVerificationService.verifyOtp(phone, "123456"));
     }
 
     @Test
     void testVerifyInvalidOtpThrowsBadRequest() {
         String phone = "+15554443333";
-        phoneVerificationService.sendOtp(phone);
+        storeOtp(phone, "654321");
 
         assertThrows(BadRequestException.class, () -> phoneVerificationService.verifyOtp(phone, "000000"));
     }

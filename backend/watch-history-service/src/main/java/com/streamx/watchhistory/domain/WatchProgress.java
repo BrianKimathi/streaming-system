@@ -5,9 +5,18 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Progress of one profile on one playable item: contentId is the movie id or the episode id, titleId is the movie id
+ * or the show id. episodeId is kept for older readers and equals contentId for series episodes.
+ */
 @Entity
-@Table(name = "watch_progress")
+@Table(name = "watch_progress",
+        uniqueConstraints = @UniqueConstraint(name = "uk_watch_progress_profile_content",
+                columnNames = {"profile_id", "content_id"}),
+        indexes = @Index(name = "idx_watch_progress_profile_title", columnList = "profile_id, title_id"))
 public class WatchProgress {
+
+    public static final double COMPLETION_THRESHOLD_PERCENT = 90.0;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,6 +30,13 @@ public class WatchProgress {
 
     @Column(nullable = false)
     private UUID contentId;
+
+    // Nullable at the schema level so rows created before titles existed can be migrated in place.
+    private UUID titleId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private TitleType titleType;
 
     private UUID episodeId;
 
@@ -38,31 +54,22 @@ public class WatchProgress {
     public WatchProgress() {
     }
 
-    public WatchProgress(UUID id, UUID profileId, UUID accountId, UUID contentId, UUID episodeId,
-                         long positionSeconds, long durationSeconds, double percentage, boolean completed,
-                         LocalDateTime lastWatchedAt) {
-        this.id = id;
-        this.profileId = profileId;
-        this.accountId = accountId;
-        this.contentId = contentId;
-        this.episodeId = episodeId;
-        this.positionSeconds = positionSeconds;
-        this.durationSeconds = durationSeconds;
-        this.percentage = percentage;
-        this.completed = completed;
-        this.lastWatchedAt = lastWatchedAt;
-    }
-
     @PrePersist
     @PreUpdate
     protected void onSave() {
-        lastWatchedAt = LocalDateTime.now();
-        if (durationSeconds > 0) {
-            this.percentage = Math.min(100.0, ((double) positionSeconds / durationSeconds) * 100.0);
-            if (this.percentage >= 90.0) {
-                this.completed = true;
-            }
+        if (lastWatchedAt == null) {
+            lastWatchedAt = LocalDateTime.now();
         }
+    }
+
+    /** Records the latest playback position; completion follows the position, so rewatching from the start resets it. */
+    public void applyPosition(long positionSeconds, long durationSeconds) {
+        this.durationSeconds = Math.max(0, durationSeconds);
+        this.positionSeconds = Math.max(0, Math.min(positionSeconds, this.durationSeconds));
+        this.percentage = this.durationSeconds > 0
+                ? Math.min(100.0, ((double) this.positionSeconds / this.durationSeconds) * 100.0)
+                : 0.0;
+        this.completed = this.percentage >= COMPLETION_THRESHOLD_PERCENT;
     }
 
     public UUID getId() {
@@ -95,6 +102,22 @@ public class WatchProgress {
 
     public void setContentId(UUID contentId) {
         this.contentId = contentId;
+    }
+
+    public UUID getTitleId() {
+        return titleId;
+    }
+
+    public void setTitleId(UUID titleId) {
+        this.titleId = titleId;
+    }
+
+    public TitleType getTitleType() {
+        return titleType;
+    }
+
+    public void setTitleType(TitleType titleType) {
+        this.titleType = titleType;
     }
 
     public UUID getEpisodeId() {

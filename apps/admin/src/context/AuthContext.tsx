@@ -1,52 +1,68 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthState } from '../types';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import type { AuthResponse, AuthState } from '../types';
+import api, { SESSION_EXPIRED_EVENT, STORAGE_KEYS, clearSession, storeSession } from '../api/client';
 
 interface AuthContextType extends AuthState {
-  login: (token: string, accountId: string, email: string) => void;
-  logout: () => void;
+  login: (auth: AuthResponse) => void;
+  logout: () => Promise<void>;
+  sessionExpired: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function readStoredRoles(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.roles) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredState(): AuthState {
+  const token = localStorage.getItem(STORAGE_KEYS.token);
+  return {
+    token,
+    accountId: localStorage.getItem(STORAGE_KEYS.accountId),
+    email: localStorage.getItem(STORAGE_KEYS.email),
+    roles: readStoredRoles(),
+    isAuthenticated: !!token,
+  };
+}
+
+const signedOut: AuthState = { token: null, accountId: null, email: null, roles: [], isAuthenticated: false };
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>({
-    token: localStorage.getItem('streamx_admin_token'),
-    accountId: localStorage.getItem('streamx_admin_account_id'),
-    email: localStorage.getItem('streamx_admin_email'),
-    roles: ['ROLE_ADMIN', 'ROLE_MANAGER'],
-    isAuthenticated: !!localStorage.getItem('streamx_admin_token'),
-  });
+  const [authState, setAuthState] = useState<AuthState>(readStoredState);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  const login = (token: string, accountId: string, email: string) => {
-    localStorage.setItem('streamx_admin_token', token);
-    localStorage.setItem('streamx_admin_account_id', accountId);
-    localStorage.setItem('streamx_admin_email', email);
-    setAuthState({
-      token,
-      accountId,
-      email,
-      roles: ['ROLE_ADMIN', 'ROLE_MANAGER'],
-      isAuthenticated: true,
-    });
-  };
+  useEffect(() => {
+    const onExpired = () => {
+      setSessionExpired(true);
+      setAuthState(signedOut);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('streamx_admin_token');
-    localStorage.removeItem('streamx_admin_account_id');
-    localStorage.removeItem('streamx_admin_email');
-    setAuthState({
-      token: null,
-      accountId: null,
-      email: null,
-      roles: [],
-      isAuthenticated: false,
-    });
-  };
+  const login = useCallback((auth: AuthResponse) => {
+    storeSession(auth);
+    setSessionExpired(false);
+    setAuthState(readStoredState());
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // The local session is cleared regardless; the refresh token expires server-side.
+    }
+    clearSession();
+    setAuthState(signedOut);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ ...authState, login, logout, sessionExpired }}>{children}</AuthContext.Provider>
   );
 };
 

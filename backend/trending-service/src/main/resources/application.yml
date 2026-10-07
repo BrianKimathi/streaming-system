@@ -17,8 +17,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+services:
+  catalog-url: ${CATALOG_SERVICE_URL:http://localhost:8083}
+
 jwt:
-  secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+  secret: ${JWT_SECRET:9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a}
   access-token-expiration-ms: 900000
   refresh-token-expiration-ms: 604800000
 

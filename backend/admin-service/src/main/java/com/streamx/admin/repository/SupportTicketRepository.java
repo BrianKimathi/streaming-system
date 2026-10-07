@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface SupportTicketRepository extends JpaRepository<SupportTicket, UUID> {
     List<SupportTicket> findByAccountIdOrderByCreatedAtDesc(UUID accountId);
     List<SupportTicket> findByStatus(String status);
+    List<SupportTicket> findAllByOrderByCreatedAtDesc();
 }

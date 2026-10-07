@@ -7,7 +7,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "payment_transactions")
+@Table(name = "payment_transactions", indexes = {
+        @Index(name = "idx_payment_txn_checkout_request", columnList = "checkoutRequestId"),
+        @Index(name = "idx_payment_txn_account", columnList = "accountId")
+})
 public class PaymentTransaction {
 
     @Id
@@ -18,6 +21,9 @@ public class PaymentTransaction {
     private UUID accountId;
 
     private UUID subscriptionId;
+
+    private UUID planId;
+    private String planName;
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -30,6 +36,9 @@ public class PaymentTransaction {
     private PaymentStatus status = PaymentStatus.INITIATED;
 
     private String paymentMethod;
+    private String phoneNumber;
+    private String merchantRequestId;
+    private String checkoutRequestId;
     private String externalTransactionId;
     private String errorMessage;
 
@@ -39,26 +48,13 @@ public class PaymentTransaction {
     public PaymentTransaction() {
     }
 
-    public PaymentTransaction(UUID id, UUID accountId, UUID subscriptionId, BigDecimal amount, String currency,
-                              PaymentStatus status, String paymentMethod, String externalTransactionId,
-                              String errorMessage, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id;
-        this.accountId = accountId;
-        this.subscriptionId = subscriptionId;
-        this.amount = amount;
-        this.currency = currency != null ? currency : "KES";
-        this.status = status != null ? status : PaymentStatus.INITIATED;
-        this.paymentMethod = paymentMethod;
-        this.externalTransactionId = externalTransactionId;
-        this.errorMessage = errorMessage;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
-
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
     }
 
     @PreUpdate
@@ -88,6 +84,22 @@ public class PaymentTransaction {
 
     public void setSubscriptionId(UUID subscriptionId) {
         this.subscriptionId = subscriptionId;
+    }
+
+    public UUID getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(UUID planId) {
+        this.planId = planId;
+    }
+
+    public String getPlanName() {
+        return planName;
+    }
+
+    public void setPlanName(String planName) {
+        this.planName = planName;
     }
 
     public BigDecimal getAmount() {
@@ -120,6 +132,30 @@ public class PaymentTransaction {
 
     public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getMerchantRequestId() {
+        return merchantRequestId;
+    }
+
+    public void setMerchantRequestId(String merchantRequestId) {
+        this.merchantRequestId = merchantRequestId;
+    }
+
+    public String getCheckoutRequestId() {
+        return checkoutRequestId;
+    }
+
+    public void setCheckoutRequestId(String checkoutRequestId) {
+        this.checkoutRequestId = checkoutRequestId;
     }
 
     public String getExternalTransactionId() {

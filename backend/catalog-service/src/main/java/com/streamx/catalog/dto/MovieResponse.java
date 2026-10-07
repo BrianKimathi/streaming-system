@@ -3,6 +3,7 @@ package com.streamx.catalog.dto;
 import com.streamx.catalog.domain.ContentStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Set;
 
 public class MovieResponse {
@@ -18,6 +19,7 @@ public class MovieResponse {
     private String mediaAssetUrl;
     private ContentStatus status;
     private Set<GenreResponse> genres;
+    private LocalDateTime createdAt;
 
     public MovieResponse() {
     }
@@ -133,5 +135,13 @@ public class MovieResponse {
 
     public void setGenres(Set<GenreResponse> genres) {
         this.genres = genres;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

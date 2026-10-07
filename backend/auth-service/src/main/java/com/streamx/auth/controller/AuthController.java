@@ -37,8 +37,24 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId) {
-        authService.logout(accountId);
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @RequestHeader(value = SecurityConstants.HEADER_X_ACCOUNT_ID, required = false) String accountId,
+            @RequestBody(required = false) LogoutRequest request) {
+        authService.logout(accountId, request == null ? null : request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully", null));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<AccountResponse>> me(
+            @RequestHeader(value = SecurityConstants.HEADER_X_ACCOUNT_ID, required = false) String accountId) {
+        return ResponseEntity.ok(ApiResponse.success(authService.getCurrentAccount(accountId)));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<AuthResponse>> changePassword(
+            @RequestHeader(value = SecurityConstants.HEADER_X_ACCOUNT_ID, required = false) String accountId,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        AuthResponse response = authService.changePassword(accountId, request);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully", response));
     }
 }

@@ -10,17 +10,19 @@ public class PlaybackAuthResponse {
     private String streamUrl;
     private PlaybackStatus status;
     private LocalDateTime expiresAt;
+    private Integer durationSeconds;
 
     public PlaybackAuthResponse() {
     }
 
     public PlaybackAuthResponse(String sessionId, String contentId, String streamUrl,
-                                PlaybackStatus status, LocalDateTime expiresAt) {
+                                PlaybackStatus status, LocalDateTime expiresAt, Integer durationSeconds) {
         this.sessionId = sessionId;
         this.contentId = contentId;
         this.streamUrl = streamUrl;
         this.status = status;
         this.expiresAt = expiresAt;
+        this.durationSeconds = durationSeconds;
     }
 
     public String getSessionId() {
@@ -61,5 +63,13 @@ public class PlaybackAuthResponse {
 
     public void setExpiresAt(LocalDateTime expiresAt) {
         this.expiresAt = expiresAt;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(Integer durationSeconds) {
+        this.durationSeconds = durationSeconds;
     }
 }

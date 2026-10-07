@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Production build output
-!dist/
+# Production build output (built inside the Docker image)
+dist/
 dist-ssr/
 *.local
 

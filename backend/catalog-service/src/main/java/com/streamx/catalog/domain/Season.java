@@ -6,17 +6,18 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "seasons")
+@Table(name = "seasons", uniqueConstraints = @UniqueConstraint(
+        name = "uk_seasons_show_number", columnNames = {"tv_show_id", "season_number"}))
 public class Season {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "tv_show_id", nullable = false)
     private UUID tvShowId;
 
-    @Column(nullable = false)
+    @Column(name = "season_number", nullable = false)
     private Integer seasonNumber;
 
     private String title;

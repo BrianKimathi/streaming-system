@@ -3,6 +3,7 @@ package com.streamx.media.exception;
 import com.streamx.common.dto.ApiResponse;
 import com.streamx.common.exception.BadRequestException;
 import com.streamx.common.exception.DomainException;
+import com.streamx.common.exception.ForbiddenException;
 import com.streamx.common.exception.ResourceNotFoundException;
 import com.streamx.common.exception.UnauthorizedException;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Object>> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Object>> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(ex.getMessage()));
     }
 

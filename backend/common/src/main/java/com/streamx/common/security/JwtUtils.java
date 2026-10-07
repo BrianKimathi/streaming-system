@@ -42,6 +42,38 @@ public class JwtUtils {
         return buildToken(claims, accountId, accessTokenExpirationMs);
     }
 
+    /**
+     * Short-lived, content-scoped token embedded in HLS stream URLs. It is not an access token:
+     * the gateway refuses it as a bearer token and media-service only accepts it for the content it names.
+     */
+    public String generateStreamToken(String accountId, String contentId, String sessionId, long ttlMs) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(SecurityConstants.CLAIM_TOKEN_TYPE, SecurityConstants.TOKEN_TYPE_STREAM);
+        claims.put(SecurityConstants.CLAIM_CONTENT_ID, contentId);
+        claims.put(SecurityConstants.CLAIM_SESSION_ID, sessionId);
+        return buildToken(claims, accountId, ttlMs);
+    }
+
+    /** Returns the claims if the token is a valid, unexpired stream token for the given content, otherwise null. */
+    public Claims parseStreamToken(String token, String contentId) {
+        try {
+            Claims claims = extractAllClaims(token);
+            if (!SecurityConstants.TOKEN_TYPE_STREAM.equals(claims.get(SecurityConstants.CLAIM_TOKEN_TYPE, String.class))) {
+                return null;
+            }
+            if (contentId == null || !contentId.equalsIgnoreCase(claims.get(SecurityConstants.CLAIM_CONTENT_ID, String.class))) {
+                return null;
+            }
+            return claims;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static boolean isStreamToken(Claims claims) {
+        return SecurityConstants.TOKEN_TYPE_STREAM.equals(claims.get(SecurityConstants.CLAIM_TOKEN_TYPE, String.class));
+    }
+
     public String generateRefreshToken(String accountId) {
         return buildToken(new HashMap<>(), accountId, refreshTokenExpirationMs);
     }
@@ -73,6 +105,11 @@ public class JwtUtils {
     public List<String> getRolesFromToken(String token) {
         Claims claims = extractAllClaims(token);
         return claims.get(SecurityConstants.CLAIM_ROLES, List.class);
+    }
+
+    public String getEmailFromToken(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get(SecurityConstants.CLAIM_EMAIL, String.class);
     }
 
     public String getProfileIdFromToken(String token) {

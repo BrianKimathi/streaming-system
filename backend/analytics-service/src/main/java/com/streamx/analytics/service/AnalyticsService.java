@@ -1,84 +1,104 @@
 package com.streamx.analytics.service;
 
-import com.streamx.analytics.domain.DailyAnalytics;
-import com.streamx.analytics.dto.AnalyticsDashboardDto;
-import com.streamx.analytics.dto.RecordStreamEventDto;
-import com.streamx.analytics.repository.DailyAnalyticsRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
-import java.time.LocalDate;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Builds the admin dashboard from live data owned by each microservice.
+ * Every section reports whether it could be loaded so the UI never shows invented numbers.
+ */
 @Service
 public class AnalyticsService {
 
-    private final DailyAnalyticsRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsService.class);
 
-    public AnalyticsService(DailyAnalyticsRepository repository) {
-        this.repository = repository;
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    private final Map<String, String> sources = new LinkedHashMap<>();
+
+    public AnalyticsService(ObjectMapper objectMapper,
+                            @Value("${services.auth-url}") String authUrl,
+                            @Value("${services.catalog-url}") String catalogUrl,
+                            @Value("${services.subscription-url}") String subscriptionUrl,
+                            @Value("${services.billing-url}") String billingUrl,
+                            @Value("${services.device-url}") String deviceUrl,
+                            @Value("${services.media-url}") String mediaUrl,
+                            @Value("${services.playback-url}") String playbackUrl,
+                            @Value("${services.watch-history-url}") String watchHistoryUrl,
+                            @Value("${services.notification-url}") String notificationUrl) {
+        this.objectMapper = objectMapper;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(2000);
+        factory.setReadTimeout(6000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
+
+        sources.put("users", authUrl + "/api/v1/auth/admin/stats");
+        sources.put("catalog", catalogUrl + "/api/v1/catalog/admin/stats");
+        sources.put("subscriptions", subscriptionUrl + "/api/v1/subscriptions/admin/stats");
+        sources.put("billing", billingUrl + "/api/v1/billing/admin/stats");
+        sources.put("devices", deviceUrl + "/api/v1/devices/admin/stats");
+        sources.put("media", mediaUrl + "/api/v1/media/admin/stats");
+        sources.put("playback", playbackUrl + "/api/v1/playback/admin/stats");
+        sources.put("watchHistory", watchHistoryUrl + "/api/v1/watch-history/admin/stats");
+        sources.put("notifications", notificationUrl + "/api/v1/notifications/admin/stats");
     }
 
-    public AnalyticsDashboardDto getDashboard(LocalDate date) {
-        LocalDate targetDate = (date != null) ? date : LocalDate.now();
-        DailyAnalytics analytics = repository.findByDate(targetDate)
-                .orElseGet(() -> repository.findFirstByOrderByDateDesc()
-                        .orElseGet(() -> createDefaultAnalytics(targetDate)));
+    public Map<String, Object> getDashboard() {
+        Map<String, CompletableFuture<Map<String, Object>>> futures = new LinkedHashMap<>();
+        sources.forEach((section, url) ->
+                futures.put(section, CompletableFuture.supplyAsync(() -> fetchSection(section, url), executor)));
 
-        return mapToDto(analytics);
+        Map<String, Object> sections = new LinkedHashMap<>();
+        futures.forEach((section, future) -> {
+            try {
+                sections.put(section, future.get(8, TimeUnit.SECONDS));
+            } catch (Exception e) {
+                sections.put(section, unavailable("Timed out"));
+            }
+        });
+
+        Map<String, Object> dashboard = new LinkedHashMap<>();
+        dashboard.put("generatedAt", Instant.now().toString());
+        dashboard.put("sections", sections);
+        return dashboard;
     }
 
-    @Transactional
-    public AnalyticsDashboardDto recordStreamEvent(RecordStreamEventDto request) {
-        LocalDate today = LocalDate.now();
-        DailyAnalytics analytics = repository.findByDate(today)
-                .orElseGet(() -> new DailyAnalytics(today));
-
-        analytics.setTotalStreamsStarted(analytics.getTotalStreamsStarted() + 1);
-        analytics.setTotalWatchTimeSeconds(analytics.getTotalWatchTimeSeconds() + request.getWatchTimeSeconds());
-
-        if (request.isNewActiveUser()) {
-            analytics.setDailyActiveUsers(analytics.getDailyActiveUsers() + 1);
-            analytics.setMonthlyActiveUsers(analytics.getMonthlyActiveUsers() + 1);
+    private Map<String, Object> fetchSection(String section, String url) {
+        try {
+            JsonNode body = restClient.get().uri(url).retrieve().body(JsonNode.class);
+            JsonNode data = body == null ? null : body.get("data");
+            if (data == null || data.isNull()) {
+                return unavailable("Service returned no data");
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("available", true);
+            result.put("data", objectMapper.convertValue(data, Map.class));
+            return result;
+        } catch (Exception e) {
+            log.warn("Could not load {} stats from {}: {}", section, url, e.getMessage());
+            return unavailable(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
-
-        if (request.getSubscriptionPaymentAmount() > 0) {
-            analytics.setTotalRevenue(analytics.getTotalRevenue() + request.getSubscriptionPaymentAmount());
-            analytics.setTotalSubscriptionsActive(analytics.getTotalSubscriptionsActive() + 1);
-        }
-
-        // Recalculate average completion rate
-        long streams = analytics.getTotalStreamsStarted();
-        double currentAvg = analytics.getAverageCompletionRate();
-        double newAvg = ((currentAvg * (streams - 1)) + request.getCompletionPercentage()) / streams;
-        analytics.setAverageCompletionRate(newAvg);
-
-        DailyAnalytics saved = repository.save(analytics);
-        return mapToDto(saved);
     }
 
-    private DailyAnalytics createDefaultAnalytics(LocalDate date) {
-        DailyAnalytics analytics = new DailyAnalytics(date);
-        analytics.setDailyActiveUsers(1250);
-        analytics.setMonthlyActiveUsers(15400);
-        analytics.setTotalWatchTimeSeconds(4500000);
-        analytics.setAverageCompletionRate(78.5);
-        analytics.setTotalStreamsStarted(3200);
-        analytics.setTotalSubscriptionsActive(14200);
-        analytics.setTotalRevenue(141858.0);
-        return analytics;
-    }
-
-    private AnalyticsDashboardDto mapToDto(DailyAnalytics analytics) {
-        double watchTimeHours = Math.round((analytics.getTotalWatchTimeSeconds() / 3600.0) * 100.0) / 100.0;
-        return new AnalyticsDashboardDto(
-                analytics.getDate(),
-                analytics.getDailyActiveUsers(),
-                analytics.getMonthlyActiveUsers(),
-                watchTimeHours,
-                analytics.getAverageCompletionRate(),
-                analytics.getTotalStreamsStarted(),
-                analytics.getTotalSubscriptionsActive(),
-                analytics.getTotalRevenue()
-        );
+    private static Map<String, Object> unavailable(String error) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("available", false);
+        result.put("error", error);
+        return result;
     }
 }

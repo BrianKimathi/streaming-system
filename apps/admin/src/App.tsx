@@ -30,35 +30,35 @@ const MainLayout: React.FC = () => {
   const getTabTitle = (tab: string) => {
     switch (tab) {
       case 'dashboard':
-        return 'Executive Analytics Dashboard';
+        return 'Platform Overview';
       case 'users':
-        return 'User Accounts & Access Blocking';
+        return 'User Accounts';
       case 'catalog':
-        return 'Movie & TV Catalog Management';
+        return 'Movie & TV Catalog';
       case 'genres':
-        return 'Genre Categories & Taxonomy';
+        return 'Genres';
       case 'media':
-        return 'HLS Media Pipeline & Transcoding';
+        return 'Media Uploads & HLS Transcoding';
       case 'subscriptions':
-        return 'Subscription Plans & Entitlement Rules';
+        return 'Subscriptions & Plans';
       case 'billing':
-        return 'Billing Transactions & Refund Control';
+        return 'Billing Transactions & Refunds';
       case 'devices':
-        return 'Registered Device Management';
+        return 'Registered Devices';
       case 'trending':
-        return 'Velocity Score Intelligence';
+        return 'Trending Content';
       case 'notifications':
-        return 'Notifications Audit & Dispatch Log';
+        return 'Notification Delivery Log';
       case 'support':
-        return 'Support Ticket Management & Context';
+        return 'Support Tickets';
       case 'audit-logs':
-        return 'System Audit Trail & Immutable Logs';
+        return 'Admin Audit Trail';
       case 'flags':
-        return 'Feature Flag Rollouts & AB Testing';
+        return 'Feature Flags';
       case 'ops-health':
-        return 'Platform Operations & Infrastructure Health';
+        return 'Operations & Service Health';
       case 'settings':
-        return 'System Settings & Platform Configuration';
+        return 'Settings';
       default:
         return 'Control Center';
     }

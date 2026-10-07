@@ -26,6 +26,11 @@ public class MediaAsset {
 
     private Integer durationSeconds;
 
+    private Long fileSizeBytes;
+
+    @Column(length = 2000)
+    private String failureReason;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -111,6 +116,22 @@ public class MediaAsset {
 
     public void setDurationSeconds(Integer durationSeconds) {
         this.durationSeconds = durationSeconds;
+    }
+
+    public Long getFileSizeBytes() {
+        return fileSizeBytes;
+    }
+
+    public void setFileSizeBytes(Long fileSizeBytes) {
+        this.fileSizeBytes = fileSizeBytes;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
     }
 
     public LocalDateTime getCreatedAt() {

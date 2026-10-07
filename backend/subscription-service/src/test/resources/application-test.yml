@@ -8,8 +8,15 @@ spring:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
 
 jwt:
   secret: 9a6f8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
   access-token-expiration-ms: 900000
   refresh-token-expiration-ms: 604800000
+
+subscription:
+  scheduling:
+    enabled: false

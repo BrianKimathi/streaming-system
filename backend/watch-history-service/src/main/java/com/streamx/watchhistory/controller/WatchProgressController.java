@@ -24,7 +24,7 @@ public class WatchProgressController {
     @PostMapping("/progress")
     public ResponseEntity<ApiResponse<WatchProgressResponse>> recordProgress(
             @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId,
-            @RequestHeader(SecurityConstants.HEADER_X_PROFILE_ID) String profileId,
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId,
             @Valid @RequestBody RecordProgressRequest request) {
         WatchProgressResponse response = watchProgressService.recordProgress(accountId, profileId, request);
         return ResponseEntity.ok(ApiResponse.success("Watch progress recorded", response));
@@ -32,16 +32,29 @@ public class WatchProgressController {
 
     @GetMapping("/continue-watching")
     public ResponseEntity<ApiResponse<List<WatchProgressResponse>>> getContinueWatching(
-            @RequestHeader(SecurityConstants.HEADER_X_PROFILE_ID) String profileId) {
-        List<WatchProgressResponse> response = watchProgressService.getContinueWatching(profileId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId) {
+        return ResponseEntity.ok(ApiResponse.success(watchProgressService.getContinueWatching(profileId)));
+    }
+
+    @GetMapping("/titles/{titleId}")
+    public ResponseEntity<ApiResponse<List<WatchProgressResponse>>> getTitleProgress(
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId,
+            @PathVariable("titleId") String titleId) {
+        return ResponseEntity.ok(ApiResponse.success(watchProgressService.getTitleProgress(profileId, titleId)));
+    }
+
+    @DeleteMapping("/titles/{titleId}")
+    public ResponseEntity<ApiResponse<Void>> removeTitle(
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId,
+            @PathVariable("titleId") String titleId) {
+        watchProgressService.removeTitle(profileId, titleId);
+        return ResponseEntity.ok(ApiResponse.success("Removed from Continue Watching", null));
     }
 
     @GetMapping("/{contentId}")
     public ResponseEntity<ApiResponse<WatchProgressResponse>> getProgress(
-            @RequestHeader(SecurityConstants.HEADER_X_PROFILE_ID) String profileId,
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId,
             @PathVariable("contentId") String contentId) {
-        WatchProgressResponse response = watchProgressService.getProgress(profileId, contentId);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ResponseEntity.ok(ApiResponse.success(watchProgressService.getProgress(profileId, contentId)));
     }
 }

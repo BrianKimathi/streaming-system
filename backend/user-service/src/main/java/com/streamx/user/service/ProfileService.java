@@ -9,6 +9,7 @@ import com.streamx.user.domain.Profile;
 import com.streamx.user.domain.ProfileType;
 import com.streamx.user.dto.*;
 import com.streamx.user.repository.ProfileRepository;
+import com.streamx.user.repository.WatchlistItemRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,15 +28,21 @@ public class ProfileService {
     private static final Logger log = LoggerFactory.getLogger(ProfileService.class);
 
     private final ProfileRepository profileRepository;
+    private final WatchlistItemRepository watchlistItemRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
     private static final int MAX_PROFILES_DEFAULT = 5;
     private static final int MAX_PIN_ATTEMPTS = 3;
     private static final int PIN_LOCKOUT_MINUTES = 15;
+    private static final Pattern PIN_PATTERN = Pattern.compile("^\\d{4}$");
 
-    public ProfileService(ProfileRepository profileRepository, PasswordEncoder passwordEncoder, JwtUtils jwtUtils) {
+    public ProfileService(ProfileRepository profileRepository,
+                          WatchlistItemRepository watchlistItemRepository,
+                          PasswordEncoder passwordEncoder,
+                          JwtUtils jwtUtils) {
         this.profileRepository = profileRepository;
+        this.watchlistItemRepository = watchlistItemRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
     }
@@ -48,6 +56,9 @@ public class ProfileService {
             throw new BadRequestException("Maximum profile limit reached for this account");
         }
 
+        if (request.getPin() != null) {
+            requireValidPin(request.getPin());
+        }
         String pinHash = null;
         if (request.isPinProtected()) {
             if (request.getPin() == null || request.getPin().isBlank()) {
@@ -80,7 +91,7 @@ public class ProfileService {
     @Transactional(readOnly = true)
     public List<ProfileResponse> getAccountProfiles(String accountIdStr) {
         UUID accountId = UUID.fromString(accountIdStr);
-        return profileRepository.findByAccountId(accountId)
+        return profileRepository.findByAccountIdOrderByCreatedAtAsc(accountId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -117,15 +128,22 @@ public class ProfileService {
         if (request.getAutoplayNext() != null) {
             profile.setAutoplayNext(request.getAutoplayNext());
         }
-        if (request.getPinProtected() != null) {
-            profile.setPinProtected(request.getPinProtected());
-            if (Boolean.TRUE.equals(request.getPinProtected())) {
-                if (request.getPin() != null && !request.getPin().isBlank()) {
-                    profile.setPinHash(passwordEncoder.encode(request.getPin()));
-                }
-            } else {
-                profile.setPinHash(null);
+        boolean pinSupplied = request.getPin() != null;
+        if (pinSupplied) {
+            requireValidPin(request.getPin());
+        }
+        if (Boolean.FALSE.equals(request.getPinProtected())) {
+            profile.setPinProtected(false);
+            profile.setPinHash(null);
+            resetPinLock(profile);
+        } else if (Boolean.TRUE.equals(request.getPinProtected()) || (pinSupplied && profile.isPinProtected())) {
+            if (pinSupplied) {
+                profile.setPinHash(passwordEncoder.encode(request.getPin()));
+                resetPinLock(profile);
+            } else if (profile.getPinHash() == null) {
+                throw new BadRequestException("A 4-digit PIN is required to enable PIN protection");
             }
+            profile.setPinProtected(true);
         }
 
         Profile updated = profileRepository.save(profile);
@@ -135,7 +153,21 @@ public class ProfileService {
     @Transactional
     public void deleteProfile(String accountIdStr, String profileIdStr) {
         Profile profile = getProfileEntity(accountIdStr, profileIdStr);
+        watchlistItemRepository.deleteByProfileId(profile.getId());
         profileRepository.delete(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileOwnerResponse getProfileOwner(String profileIdStr) {
+        UUID profileId;
+        try {
+            profileId = UUID.fromString(profileIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundException("Profile not found");
+        }
+        Profile profile = profileRepository.findById(profileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Profile not found"));
+        return new ProfileOwnerResponse(profile.getAccountId().toString());
     }
 
     @Transactional
@@ -190,9 +222,25 @@ public class ProfileService {
 
     private Profile getProfileEntity(String accountIdStr, String profileIdStr) {
         UUID accountId = UUID.fromString(accountIdStr);
-        UUID profileId = UUID.fromString(profileIdStr);
+        UUID profileId;
+        try {
+            profileId = UUID.fromString(profileIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundException("Profile not found");
+        }
         return profileRepository.findByIdAndAccountId(profileId, accountId)
                 .orElseThrow(() -> new ResourceNotFoundException("Profile not found"));
+    }
+
+    private static void requireValidPin(String pin) {
+        if (pin == null || !PIN_PATTERN.matcher(pin).matches()) {
+            throw new BadRequestException("PIN must be exactly 4 digits");
+        }
+    }
+
+    private static void resetPinLock(Profile profile) {
+        profile.setFailedPinAttempts(0);
+        profile.setPinLockedUntil(null);
     }
 
     private ProfileResponse mapToResponse(Profile profile) {

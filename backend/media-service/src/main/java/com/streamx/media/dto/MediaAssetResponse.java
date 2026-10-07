@@ -12,6 +12,9 @@ public class MediaAssetResponse {
     private MediaProcessingStatus status;
     private Integer durationSeconds;
     private LocalDateTime createdAt;
+    private Long fileSizeBytes;
+    private String failureReason;
+    private LocalDateTime updatedAt;
 
     public MediaAssetResponse() {
     }
@@ -81,5 +84,29 @@ public class MediaAssetResponse {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getFileSizeBytes() {
+        return fileSizeBytes;
+    }
+
+    public void setFileSizeBytes(Long fileSizeBytes) {
+        this.fileSizeBytes = fileSizeBytes;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

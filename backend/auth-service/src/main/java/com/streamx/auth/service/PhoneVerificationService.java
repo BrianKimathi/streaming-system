@@ -73,10 +73,10 @@ public class PhoneVerificationService {
         otpEntity.setAttempts(0);
         otpEntity.setVerified(false);
 
-        otpRepository.save(otpEntity);
-
         String message = String.format("Your StreamX verification code is: %s. Valid for %d minutes.", rawOtp, otpExpirationMinutes);
         smsProvider.sendSms(phoneNumber, message);
+
+        otpRepository.save(otpEntity);
     }
 
     @Transactional

@@ -7,16 +7,24 @@ public class PlaybackAuthRequest {
     @NotBlank(message = "Content ID is required")
     private String contentId;
 
+    @NotBlank(message = "Device ID is required")
     private String deviceId;
-    private int maxConcurrentStreams = 2; // Default evaluated against subscription entitlement
+
+    /** Movie or show id used for trending; defaults to contentId. */
+    private String titleId;
 
     public PlaybackAuthRequest() {
     }
 
-    public PlaybackAuthRequest(String contentId, String deviceId, int maxConcurrentStreams) {
+    public PlaybackAuthRequest(String contentId, String deviceId) {
         this.contentId = contentId;
         this.deviceId = deviceId;
-        this.maxConcurrentStreams = maxConcurrentStreams;
+    }
+
+    public PlaybackAuthRequest(String contentId, String deviceId, String titleId) {
+        this.contentId = contentId;
+        this.deviceId = deviceId;
+        this.titleId = titleId;
     }
 
     public String getContentId() {
@@ -35,11 +43,11 @@ public class PlaybackAuthRequest {
         this.deviceId = deviceId;
     }
 
-    public int getMaxConcurrentStreams() {
-        return maxConcurrentStreams;
+    public String getTitleId() {
+        return titleId;
     }
 
-    public void setMaxConcurrentStreams(int maxConcurrentStreams) {
-        this.maxConcurrentStreams = maxConcurrentStreams;
+    public void setTitleId(String titleId) {
+        this.titleId = titleId;
     }
 }

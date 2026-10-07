@@ -9,22 +9,28 @@ public class RecordProgressRequest {
     @NotBlank(message = "Content ID is required")
     private String contentId;
 
-    private String episodeId;
+    /** Movie or show id; defaults to contentId for older clients. */
+    private String titleId;
+
+    /** MOVIE or SERIES; defaults to MOVIE for older clients. */
+    private String titleType;
 
     @NotNull(message = "Position in seconds is required")
-    @Min(value = 0)
+    @Min(value = 0, message = "Position cannot be negative")
     private Long positionSeconds;
 
     @NotNull(message = "Duration in seconds is required")
-    @Min(value = 1)
+    @Min(value = 1, message = "Duration must be at least 1 second")
     private Long durationSeconds;
 
     public RecordProgressRequest() {
     }
 
-    public RecordProgressRequest(String contentId, String episodeId, Long positionSeconds, Long durationSeconds) {
+    public RecordProgressRequest(String contentId, String titleId, String titleType,
+                                 Long positionSeconds, Long durationSeconds) {
         this.contentId = contentId;
-        this.episodeId = episodeId;
+        this.titleId = titleId;
+        this.titleType = titleType;
         this.positionSeconds = positionSeconds;
         this.durationSeconds = durationSeconds;
     }
@@ -37,12 +43,20 @@ public class RecordProgressRequest {
         this.contentId = contentId;
     }
 
-    public String getEpisodeId() {
-        return episodeId;
+    public String getTitleId() {
+        return titleId;
     }
 
-    public void setEpisodeId(String episodeId) {
-        this.episodeId = episodeId;
+    public void setTitleId(String titleId) {
+        this.titleId = titleId;
+    }
+
+    public String getTitleType() {
+        return titleType;
+    }
+
+    public void setTitleType(String titleType) {
+        this.titleType = titleType;
     }
 
     public Long getPositionSeconds() {

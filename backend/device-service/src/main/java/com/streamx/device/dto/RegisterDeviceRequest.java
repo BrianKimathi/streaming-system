@@ -3,13 +3,16 @@ package com.streamx.device.dto;
 import com.streamx.device.domain.DeviceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class RegisterDeviceRequest {
 
     @NotBlank(message = "Device fingerprint is required")
+    @Size(max = 255, message = "Device fingerprint is too long")
     private String deviceFingerprint;
 
     @NotBlank(message = "Device name is required")
+    @Size(max = 255, message = "Device name is too long")
     private String deviceName;
 
     @NotNull(message = "Device type is required")
@@ -17,18 +20,16 @@ public class RegisterDeviceRequest {
 
     private String platform;
     private String appVersion;
-    private int maxAllowedDevices = 2; // Passed or evaluated against subscription
 
     public RegisterDeviceRequest() {
     }
 
-    public RegisterDeviceRequest(String deviceFingerprint, String deviceName, DeviceType deviceType, String platform, String appVersion, int maxAllowedDevices) {
+    public RegisterDeviceRequest(String deviceFingerprint, String deviceName, DeviceType deviceType, String platform, String appVersion) {
         this.deviceFingerprint = deviceFingerprint;
         this.deviceName = deviceName;
         this.deviceType = deviceType;
         this.platform = platform;
         this.appVersion = appVersion;
-        this.maxAllowedDevices = maxAllowedDevices;
     }
 
     public String getDeviceFingerprint() {
@@ -69,13 +70,5 @@ public class RegisterDeviceRequest {
 
     public void setAppVersion(String appVersion) {
         this.appVersion = appVersion;
-    }
-
-    public int getMaxAllowedDevices() {
-        return maxAllowedDevices;
-    }
-
-    public void setMaxAllowedDevices(int maxAllowedDevices) {
-        this.maxAllowedDevices = maxAllowedDevices;
     }
 }

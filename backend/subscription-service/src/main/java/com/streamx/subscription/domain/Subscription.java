@@ -30,6 +30,8 @@ public class Subscription {
     private LocalDateTime currentPeriodEnd;
     private boolean cancelAtPeriodEnd = false;
 
+    private UUID lastPaymentTransactionId;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -124,6 +126,14 @@ public class Subscription {
 
     public void setCancelAtPeriodEnd(boolean cancelAtPeriodEnd) {
         this.cancelAtPeriodEnd = cancelAtPeriodEnd;
+    }
+
+    public UUID getLastPaymentTransactionId() {
+        return lastPaymentTransactionId;
+    }
+
+    public void setLastPaymentTransactionId(UUID lastPaymentTransactionId) {
+        this.lastPaymentTransactionId = lastPaymentTransactionId;
     }
 
     public LocalDateTime getCreatedAt() {

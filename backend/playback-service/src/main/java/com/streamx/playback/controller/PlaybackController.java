@@ -22,21 +22,25 @@ public class PlaybackController {
     @PostMapping("/request")
     public ResponseEntity<ApiResponse<PlaybackAuthResponse>> authorizePlayback(
             @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId,
-            @RequestHeader(SecurityConstants.HEADER_X_PROFILE_ID) String profileId,
+            @RequestHeader(value = SecurityConstants.HEADER_X_PROFILE_ID, required = false) String profileId,
             @Valid @RequestBody PlaybackAuthRequest request) {
         PlaybackAuthResponse response = playbackService.authorizePlayback(accountId, profileId, request);
         return ResponseEntity.ok(ApiResponse.success("Playback authorized", response));
     }
 
     @PostMapping("/sessions/{id}/heartbeat")
-    public ResponseEntity<ApiResponse<Void>> heartbeat(@PathVariable("id") String sessionId) {
-        playbackService.heartbeat(sessionId);
+    public ResponseEntity<ApiResponse<Void>> heartbeat(
+            @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId,
+            @PathVariable("id") String sessionId) {
+        playbackService.heartbeat(accountId, sessionId);
         return ResponseEntity.ok(ApiResponse.success("Heartbeat recorded", null));
     }
 
     @PostMapping("/sessions/{id}/stop")
-    public ResponseEntity<ApiResponse<Void>> endSession(@PathVariable("id") String sessionId) {
-        playbackService.endSession(sessionId);
+    public ResponseEntity<ApiResponse<Void>> endSession(
+            @RequestHeader(SecurityConstants.HEADER_X_ACCOUNT_ID) String accountId,
+            @PathVariable("id") String sessionId) {
+        playbackService.endSession(accountId, sessionId);
         return ResponseEntity.ok(ApiResponse.success("Playback session ended", null));
     }
 }

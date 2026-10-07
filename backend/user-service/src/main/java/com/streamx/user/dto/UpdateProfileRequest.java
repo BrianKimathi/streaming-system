@@ -15,7 +15,7 @@ public class UpdateProfileRequest {
     private Boolean autoplayNext;
     private Boolean pinProtected;
 
-    @Pattern(regexp = "^\\d{4}$", message = "PIN must be 4 digits")
+    @Pattern(regexp = "^\\d{4}$", message = "PIN must be exactly 4 digits")
     private String pin;
 
     public UpdateProfileRequest() {

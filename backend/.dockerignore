@@ -1,0 +1,7 @@
+**/target
+**/media-storage
+.env
+.env.*
+**/*.log
+.idea
+.vscode
