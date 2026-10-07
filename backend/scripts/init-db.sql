@@ -1,13 +1,13 @@
-CREATE DATABASE auth_db;
-CREATE DATABASE user_db;
-CREATE DATABASE catalog_db;
-CREATE DATABASE subscription_db;
-CREATE DATABASE billing_db;
-CREATE DATABASE device_db;
-CREATE DATABASE media_db;
-CREATE DATABASE playback_db;
-CREATE DATABASE watch_history_db;
-CREATE DATABASE trending_db;
-CREATE DATABASE analytics_db;
-CREATE DATABASE notification_db;
-CREATE DATABASE admin_db;
+SELECT 'CREATE DATABASE auth_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auth_db')\gexec
+SELECT 'CREATE DATABASE user_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'user_db')\gexec
+SELECT 'CREATE DATABASE catalog_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'catalog_db')\gexec
+SELECT 'CREATE DATABASE subscription_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'subscription_db')\gexec
+SELECT 'CREATE DATABASE billing_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'billing_db')\gexec
+SELECT 'CREATE DATABASE device_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'device_db')\gexec
+SELECT 'CREATE DATABASE media_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'media_db')\gexec
+SELECT 'CREATE DATABASE playback_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'playback_db')\gexec
+SELECT 'CREATE DATABASE watch_history_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'watch_history_db')\gexec
+SELECT 'CREATE DATABASE trending_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'trending_db')\gexec
+SELECT 'CREATE DATABASE analytics_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'analytics_db')\gexec
+SELECT 'CREATE DATABASE notification_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'notification_db')\gexec
+SELECT 'CREATE DATABASE admin_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'admin_db')\gexec
